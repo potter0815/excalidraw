@@ -2285,6 +2285,10 @@ class App extends React.Component<AppProps, AppState> {
   ) => {
     event.persist();
 
+    if (this.state.openMenu) {
+      this.setState({ openMenu: null });
+    }
+
     // remove any active selection when we start to interact with canvas
     // (mainly, we care about removing selection outside the component which
     //  would prevent our copy handling otherwise)
