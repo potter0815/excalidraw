@@ -1,4 +1,3 @@
-import React from "react";
 import { AppState } from "../../src/types";
 import { ButtonIconSelect } from "../components/ButtonIconSelect";
 import { ColorPicker } from "../components/ColorPicker";
@@ -7,12 +6,20 @@ import {
   ArrowheadArrowIcon,
   ArrowheadBarIcon,
   ArrowheadDotIcon,
+  ArrowheadTriangleIcon,
   ArrowheadNoneIcon,
   EdgeRoundIcon,
   EdgeSharpIcon,
   FillCrossHatchIcon,
   FillHachureIcon,
   FillSolidIcon,
+  FontFamilyCodeIcon,
+  FontFamilyHandDrawnIcon,
+  FontFamilyNormalIcon,
+  FontSizeExtraLargeIcon,
+  FontSizeLargeIcon,
+  FontSizeMediumIcon,
+  FontSizeSmallIcon,
   SloppinessArchitectIcon,
   SloppinessArtistIcon,
   SloppinessCartoonistIcon,
@@ -20,52 +27,67 @@ import {
   StrokeStyleDottedIcon,
   StrokeStyleSolidIcon,
   StrokeWidthIcon,
-  FontSizeSmallIcon,
-  FontSizeMediumIcon,
-  FontSizeLargeIcon,
-  FontSizeExtraLargeIcon,
-  FontFamilyHandDrawnIcon,
-  FontFamilyNormalIcon,
-  FontFamilyCodeIcon,
-  TextAlignLeftIcon,
   TextAlignCenterIcon,
+  TextAlignLeftIcon,
   TextAlignRightIcon,
 } from "../components/icons";
-import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE } from "../constants";
+import {
+  DEFAULT_FONT_FAMILY,
+  DEFAULT_FONT_SIZE,
+  FONT_FAMILY,
+} from "../constants";
 import {
   getNonDeletedElements,
   isTextElement,
   redrawTextBoundingBox,
 } from "../element";
-import { newElementWith } from "../element/mutateElement";
-import { isLinearElement, isLinearElementType } from "../element/typeChecks";
+import { mutateElement, newElementWith } from "../element/mutateElement";
+import {
+  getBoundTextElement,
+  getContainerElement,
+} from "../element/textElement";
+import {
+  isBoundToContainer,
+  isLinearElement,
+  isLinearElementType,
+} from "../element/typeChecks";
 import {
   Arrowhead,
   ExcalidrawElement,
   ExcalidrawLinearElement,
   ExcalidrawTextElement,
-  FontFamily,
+  FontFamilyValues,
   TextAlign,
 } from "../element/types";
 import { getLanguage, t } from "../i18n";
+import { KEYS } from "../keys";
 import { randomInteger } from "../random";
 import {
   canChangeSharpness,
   canHaveArrowheads,
   getCommonAttributeOfSelectedElements,
+  getSelectedElements,
   getTargetElements,
   isSomeElementSelected,
 } from "../scene";
+import { hasStrokeColor } from "../scene/comparisons";
+import { arrayToMap } from "../utils";
 import { register } from "./register";
+
+const FONT_SIZE_RELATIVE_INCREASE_STEP = 0.1;
 
 const changeProperty = (
   elements: readonly ExcalidrawElement[],
   appState: AppState,
   callback: (element: ExcalidrawElement) => ExcalidrawElement,
+  includeBoundText = false,
 ) => {
+  const selectedElementIds = arrayToMap(
+    getSelectedElements(elements, appState, includeBoundText),
+  );
   return elements.map((element) => {
     if (
-      appState.selectedElementIds[element.id] ||
+      selectedElementIds.get(element.id) ||
       element.id === appState.editingElement?.id
     ) {
       return callback(element);
@@ -95,17 +117,102 @@ const getFormValue = function <T>(
   );
 };
 
+const offsetElementAfterFontResize = (
+  prevElement: ExcalidrawTextElement,
+  nextElement: ExcalidrawTextElement,
+) => {
+  if (isBoundToContainer(nextElement)) {
+    return nextElement;
+  }
+  return mutateElement(
+    nextElement,
+    {
+      x:
+        prevElement.textAlign === "left"
+          ? prevElement.x
+          : prevElement.x +
+            (prevElement.width - nextElement.width) /
+              (prevElement.textAlign === "center" ? 2 : 1),
+      // centering vertically is non-standard, but for Excalidraw I think
+      // it makes sense
+      y: prevElement.y + (prevElement.height - nextElement.height) / 2,
+    },
+    false,
+  );
+};
+
+const changeFontSize = (
+  elements: readonly ExcalidrawElement[],
+  appState: AppState,
+  getNewFontSize: (element: ExcalidrawTextElement) => number,
+) => {
+  const newFontSizes = new Set<number>();
+
+  return {
+    elements: changeProperty(
+      elements,
+      appState,
+      (oldElement) => {
+        if (isTextElement(oldElement)) {
+          const newFontSize = getNewFontSize(oldElement);
+          newFontSizes.add(newFontSize);
+
+          let newElement: ExcalidrawTextElement = newElementWith(oldElement, {
+            fontSize: newFontSize,
+          });
+          redrawTextBoundingBox(
+            newElement,
+            getContainerElement(oldElement),
+            appState,
+          );
+
+          newElement = offsetElementAfterFontResize(oldElement, newElement);
+
+          return newElement;
+        }
+
+        return oldElement;
+      },
+      true,
+    ),
+    appState: {
+      ...appState,
+      // update state only if we've set all select text elements to
+      // the same font size
+      currentItemFontSize:
+        newFontSizes.size === 1
+          ? [...newFontSizes][0]
+          : appState.currentItemFontSize,
+    },
+    commitToHistory: true,
+  };
+};
+
+// -----------------------------------------------------------------------------
+
 export const actionChangeStrokeColor = register({
   name: "changeStrokeColor",
   perform: (elements, appState, value) => {
     return {
-      elements: changeProperty(elements, appState, (el) =>
-        newElementWith(el, {
-          strokeColor: value,
-        }),
-      ),
-      appState: { ...appState, currentItemStrokeColor: value },
-      commitToHistory: true,
+      ...(value.currentItemStrokeColor && {
+        elements: changeProperty(
+          elements,
+          appState,
+          (el) => {
+            return hasStrokeColor(el.type)
+              ? newElementWith(el, {
+                  strokeColor: value.currentItemStrokeColor,
+                })
+              : el;
+          },
+          true,
+        ),
+      }),
+      appState: {
+        ...appState,
+        ...value,
+      },
+      commitToHistory: !!value.currentItemStrokeColor,
     };
   },
   PanelComponent: ({ elements, appState, updateData }) => (
@@ -120,7 +227,11 @@ export const actionChangeStrokeColor = register({
           (element) => element.strokeColor,
           appState.currentItemStrokeColor,
         )}
-        onChange={updateData}
+        onChange={(color) => updateData({ currentItemStrokeColor: color })}
+        isActive={appState.openPopup === "strokeColorPicker"}
+        setActive={(active) =>
+          updateData({ openPopup: active ? "strokeColorPicker" : null })
+        }
       />
     </>
   ),
@@ -130,13 +241,18 @@ export const actionChangeBackgroundColor = register({
   name: "changeBackgroundColor",
   perform: (elements, appState, value) => {
     return {
-      elements: changeProperty(elements, appState, (el) =>
-        newElementWith(el, {
-          backgroundColor: value,
-        }),
-      ),
-      appState: { ...appState, currentItemBackgroundColor: value },
-      commitToHistory: true,
+      ...(value.currentItemBackgroundColor && {
+        elements: changeProperty(elements, appState, (el) =>
+          newElementWith(el, {
+            backgroundColor: value.currentItemBackgroundColor,
+          }),
+        ),
+      }),
+      appState: {
+        ...appState,
+        ...value,
+      },
+      commitToHistory: !!value.currentItemBackgroundColor,
     };
   },
   PanelComponent: ({ elements, appState, updateData }) => (
@@ -151,7 +267,11 @@ export const actionChangeBackgroundColor = register({
           (element) => element.backgroundColor,
           appState.currentItemBackgroundColor,
         )}
-        onChange={updateData}
+        onChange={(color) => updateData({ currentItemBackgroundColor: color })}
+        isActive={appState.openPopup === "backgroundColorPicker"}
+        setActive={(active) =>
+          updateData({ openPopup: active ? "backgroundColorPicker" : null })
+        }
       />
     </>
   ),
@@ -400,24 +520,7 @@ export const actionChangeOpacity = register({
 export const actionChangeFontSize = register({
   name: "changeFontSize",
   perform: (elements, appState, value) => {
-    return {
-      elements: changeProperty(elements, appState, (el) => {
-        if (isTextElement(el)) {
-          const element: ExcalidrawTextElement = newElementWith(el, {
-            fontSize: value,
-          });
-          redrawTextBoundingBox(element);
-          return element;
-        }
-
-        return el;
-      }),
-      appState: {
-        ...appState,
-        currentItemFontSize: value,
-      },
-      commitToHistory: true,
-    };
+    return changeFontSize(elements, appState, () => value);
   },
   PanelComponent: ({ elements, appState, updateData }) => (
     <fieldset>
@@ -449,7 +552,16 @@ export const actionChangeFontSize = register({
         value={getFormValue(
           elements,
           appState,
-          (element) => isTextElement(element) && element.fontSize,
+          (element) => {
+            if (isTextElement(element)) {
+              return element.fontSize;
+            }
+            const boundTextElement = getBoundTextElement(element);
+            if (boundTextElement) {
+              return boundTextElement.fontSize;
+            }
+            return null;
+          },
           appState.currentItemFontSize || DEFAULT_FONT_SIZE,
         )}
         onChange={(value) => updateData(value)}
@@ -458,21 +570,71 @@ export const actionChangeFontSize = register({
   ),
 });
 
+export const actionDecreaseFontSize = register({
+  name: "decreaseFontSize",
+  perform: (elements, appState, value) => {
+    return changeFontSize(elements, appState, (element) =>
+      Math.round(
+        // get previous value before relative increase (doesn't work fully
+        // due to rounding and float precision issues)
+        (1 / (1 + FONT_SIZE_RELATIVE_INCREASE_STEP)) * element.fontSize,
+      ),
+    );
+  },
+  keyTest: (event) => {
+    return (
+      event[KEYS.CTRL_OR_CMD] &&
+      event.shiftKey &&
+      // KEYS.COMMA needed for MacOS
+      (event.key === KEYS.CHEVRON_LEFT || event.key === KEYS.COMMA)
+    );
+  },
+});
+
+export const actionIncreaseFontSize = register({
+  name: "increaseFontSize",
+  perform: (elements, appState, value) => {
+    return changeFontSize(elements, appState, (element) =>
+      Math.round(element.fontSize * (1 + FONT_SIZE_RELATIVE_INCREASE_STEP)),
+    );
+  },
+  keyTest: (event) => {
+    return (
+      event[KEYS.CTRL_OR_CMD] &&
+      event.shiftKey &&
+      // KEYS.PERIOD needed for MacOS
+      (event.key === KEYS.CHEVRON_RIGHT || event.key === KEYS.PERIOD)
+    );
+  },
+});
+
 export const actionChangeFontFamily = register({
   name: "changeFontFamily",
   perform: (elements, appState, value) => {
     return {
-      elements: changeProperty(elements, appState, (el) => {
-        if (isTextElement(el)) {
-          const element: ExcalidrawTextElement = newElementWith(el, {
-            fontFamily: value,
-          });
-          redrawTextBoundingBox(element);
-          return element;
-        }
+      elements: changeProperty(
+        elements,
+        appState,
+        (oldElement) => {
+          if (isTextElement(oldElement)) {
+            const newElement: ExcalidrawTextElement = newElementWith(
+              oldElement,
+              {
+                fontFamily: value,
+              },
+            );
+            redrawTextBoundingBox(
+              newElement,
+              getContainerElement(oldElement),
+              appState,
+            );
+            return newElement;
+          }
 
-        return el;
-      }),
+          return oldElement;
+        },
+        true,
+      ),
       appState: {
         ...appState,
         currentItemFontFamily: value,
@@ -481,19 +643,23 @@ export const actionChangeFontFamily = register({
     };
   },
   PanelComponent: ({ elements, appState, updateData }) => {
-    const options: { value: FontFamily; text: string; icon: JSX.Element }[] = [
+    const options: {
+      value: FontFamilyValues;
+      text: string;
+      icon: JSX.Element;
+    }[] = [
       {
-        value: 1,
+        value: FONT_FAMILY.Virgil,
         text: t("labels.handDrawn"),
         icon: <FontFamilyHandDrawnIcon theme={appState.theme} />,
       },
       {
-        value: 2,
+        value: FONT_FAMILY.Helvetica,
         text: t("labels.normal"),
         icon: <FontFamilyNormalIcon theme={appState.theme} />,
       },
       {
-        value: 3,
+        value: FONT_FAMILY.Cascadia,
         text: t("labels.code"),
         icon: <FontFamilyCodeIcon theme={appState.theme} />,
       },
@@ -502,13 +668,22 @@ export const actionChangeFontFamily = register({
     return (
       <fieldset>
         <legend>{t("labels.fontFamily")}</legend>
-        <ButtonIconSelect<FontFamily | false>
+        <ButtonIconSelect<FontFamilyValues | false>
           group="font-family"
           options={options}
           value={getFormValue(
             elements,
             appState,
-            (element) => isTextElement(element) && element.fontFamily,
+            (element) => {
+              if (isTextElement(element)) {
+                return element.fontFamily;
+              }
+              const boundTextElement = getBoundTextElement(element);
+              if (boundTextElement) {
+                return boundTextElement.fontFamily;
+              }
+              return null;
+            },
             appState.currentItemFontFamily || DEFAULT_FONT_FAMILY,
           )}
           onChange={(value) => updateData(value)}
@@ -522,17 +697,29 @@ export const actionChangeTextAlign = register({
   name: "changeTextAlign",
   perform: (elements, appState, value) => {
     return {
-      elements: changeProperty(elements, appState, (el) => {
-        if (isTextElement(el)) {
-          const element: ExcalidrawTextElement = newElementWith(el, {
-            textAlign: value,
-          });
-          redrawTextBoundingBox(element);
-          return element;
-        }
+      elements: changeProperty(
+        elements,
+        appState,
+        (oldElement) => {
+          if (isTextElement(oldElement)) {
+            const newElement: ExcalidrawTextElement = newElementWith(
+              oldElement,
+              {
+                textAlign: value,
+              },
+            );
+            redrawTextBoundingBox(
+              newElement,
+              getContainerElement(oldElement),
+              appState,
+            );
+            return newElement;
+          }
 
-        return el;
-      }),
+          return oldElement;
+        },
+        true,
+      ),
       appState: {
         ...appState,
         currentItemTextAlign: value,
@@ -565,7 +752,16 @@ export const actionChangeTextAlign = register({
         value={getFormValue(
           elements,
           appState,
-          (element) => isTextElement(element) && element.textAlign,
+          (element) => {
+            if (isTextElement(element)) {
+              return element.textAlign;
+            }
+            const boundTextElement = getBoundTextElement(element);
+            if (boundTextElement) {
+              return boundTextElement.textAlign;
+            }
+            return null;
+          },
           appState.currentItemTextAlign,
         )}
         onChange={(value) => updateData(value)}
@@ -710,6 +906,14 @@ export const actionChangeArrowhead = register({
                 icon: <ArrowheadDotIcon theme={appState.theme} flip={!isRTL} />,
                 keyBinding: "r",
               },
+              {
+                value: "triangle",
+                text: t("labels.arrowhead_triangle"),
+                icon: (
+                  <ArrowheadTriangleIcon theme={appState.theme} flip={!isRTL} />
+                ),
+                keyBinding: "t",
+              },
             ]}
             value={getFormValue<Arrowhead | null>(
               elements,
@@ -751,6 +955,14 @@ export const actionChangeArrowhead = register({
                 text: t("labels.arrowhead_dot"),
                 keyBinding: "r",
                 icon: <ArrowheadDotIcon theme={appState.theme} flip={isRTL} />,
+              },
+              {
+                value: "triangle",
+                text: t("labels.arrowhead_triangle"),
+                icon: (
+                  <ArrowheadTriangleIcon theme={appState.theme} flip={isRTL} />
+                ),
+                keyBinding: "t",
               },
             ]}
             value={getFormValue<Arrowhead | null>(

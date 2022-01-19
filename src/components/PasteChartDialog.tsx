@@ -34,20 +34,25 @@ const ChartPreviewBtn = (props: {
       0,
     );
     setChartElements(elements);
-
-    const svg = exportToSvg(elements, {
-      exportBackground: false,
-      viewBackgroundColor: oc.white,
-      shouldAddWatermark: false,
-    });
-
+    let svg: SVGSVGElement;
     const previewNode = previewRef.current!;
 
-    previewNode.appendChild(svg);
+    (async () => {
+      svg = await exportToSvg(
+        elements,
+        {
+          exportBackground: false,
+          viewBackgroundColor: oc.white,
+        },
+        null, // files
+      );
 
-    if (props.selected) {
-      (previewNode.parentNode as HTMLDivElement).focus();
-    }
+      previewNode.appendChild(svg);
+
+      if (props.selected) {
+        (previewNode.parentNode as HTMLDivElement).focus();
+      }
+    })();
 
     return () => {
       previewNode.removeChild(svg);
@@ -77,7 +82,7 @@ export const PasteChartDialog = ({
   appState: AppState;
   onClose: () => void;
   setAppState: React.Component<any, AppState>["setState"];
-  onInsertChart: (elements: LibraryItem) => void;
+  onInsertChart: (elements: LibraryItem["elements"]) => void;
 }) => {
   const handleClose = React.useCallback(() => {
     if (onClose) {

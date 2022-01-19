@@ -1,7 +1,12 @@
 import React from "react";
 import { ExcalidrawElement } from "../element/types";
-import { AppState, ExcalidrawProps } from "../types";
-import Library from "../data/library";
+import {
+  AppClassProperties,
+  AppState,
+  ExcalidrawProps,
+  BinaryFiles,
+} from "../types";
+import { ToolButtonSize } from "../components/ToolButton";
 
 /** if false, the action should be prevented */
 export type ActionResult =
@@ -11,22 +16,18 @@ export type ActionResult =
         AppState,
         "offsetTop" | "offsetLeft" | "width" | "height"
       > | null;
+      files?: BinaryFiles | null;
       commitToHistory: boolean;
       syncHistory?: boolean;
+      replaceFiles?: boolean;
     }
   | false;
-
-type AppAPI = {
-  canvas: HTMLCanvasElement | null;
-  focusContainer(): void;
-  library: Library;
-};
 
 type ActionFn = (
   elements: readonly ExcalidrawElement[],
   appState: Readonly<AppState>,
   formData: any,
-  app: AppAPI,
+  app: AppClassProperties,
 ) => ActionResult | Promise<ActionResult>;
 
 export type UpdaterFn = (res: ActionResult) => void;
@@ -66,9 +67,9 @@ export type ActionName =
   | "changeProjectName"
   | "changeExportBackground"
   | "changeExportEmbedScene"
-  | "changeShouldAddWatermark"
-  | "saveScene"
-  | "saveAsScene"
+  | "changeExportScale"
+  | "saveToActiveFile"
+  | "saveFileToDisk"
   | "loadScene"
   | "duplicateSelection"
   | "deleteSelectedElements"
@@ -100,17 +101,21 @@ export type ActionName =
   | "flipVertical"
   | "viewMode"
   | "exportWithDarkMode"
-  | "toggleTheme";
+  | "toggleTheme"
+  | "increaseFontSize"
+  | "decreaseFontSize";
+
+export type PanelComponentProps = {
+  elements: readonly ExcalidrawElement[];
+  appState: AppState;
+  updateData: (formData?: any) => void;
+  appProps: ExcalidrawProps;
+  data?: Partial<{ id: string; size: ToolButtonSize }>;
+};
 
 export interface Action {
   name: ActionName;
-  PanelComponent?: React.FC<{
-    elements: readonly ExcalidrawElement[];
-    appState: AppState;
-    updateData: (formData?: any) => void;
-    appProps: ExcalidrawProps;
-    id?: string;
-  }>;
+  PanelComponent?: React.FC<PanelComponentProps>;
   perform: ActionFn;
   keyPriority?: number;
   keyTest?: (

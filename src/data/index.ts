@@ -1,14 +1,15 @@
-import { fileSave } from "browser-fs-access";
 import {
   copyBlobToClipboardAsPng,
   copyTextToSystemClipboard,
 } from "../clipboard";
+import { DEFAULT_EXPORT_PADDING, MIME_TYPES } from "../constants";
 import { NonDeletedExcalidrawElement } from "../element/types";
 import { t } from "../i18n";
 import { exportToCanvas, exportToSvg } from "../scene/export";
 import { ExportType } from "../scene/types";
-import { AppState } from "../types";
+import { AppState, BinaryFiles } from "../types";
 import { canvasToBlob } from "./blob";
+import { fileSave, FileSystemHandle } from "./filesystem";
 import { serializeAsJSON } from "./json";
 
 export { loadFromBlob } from "./blob";
@@ -18,60 +19,57 @@ export const exportCanvas = async (
   type: ExportType,
   elements: readonly NonDeletedExcalidrawElement[],
   appState: AppState,
+  files: BinaryFiles,
   {
     exportBackground,
-    exportPadding = 10,
+    exportPadding = DEFAULT_EXPORT_PADDING,
     viewBackgroundColor,
     name,
-    scale = 1,
-    shouldAddWatermark,
+    fileHandle = null,
   }: {
     exportBackground: boolean;
     exportPadding?: number;
     viewBackgroundColor: string;
     name: string;
-    scale?: number;
-    shouldAddWatermark: boolean;
+    fileHandle?: FileSystemHandle | null;
   },
 ) => {
   if (elements.length === 0) {
     throw new Error(t("alerts.cannotExportEmptyCanvas"));
   }
   if (type === "svg" || type === "clipboard-svg") {
-    const tempSvg = exportToSvg(elements, {
-      exportBackground,
-      exportWithDarkMode: appState.exportWithDarkMode,
-      viewBackgroundColor,
-      exportPadding,
-      scale,
-      shouldAddWatermark,
-      metadata:
-        appState.exportEmbedScene && type === "svg"
-          ? await (
-              await import(/* webpackChunkName: "image" */ "./image")
-            ).encodeSvgMetadata({
-              text: serializeAsJSON(elements, appState),
-            })
-          : undefined,
-    });
+    const tempSvg = await exportToSvg(
+      elements,
+      {
+        exportBackground,
+        exportWithDarkMode: appState.exportWithDarkMode,
+        viewBackgroundColor,
+        exportPadding,
+        exportScale: appState.exportScale,
+        exportEmbedScene: appState.exportEmbedScene && type === "svg",
+      },
+      files,
+    );
     if (type === "svg") {
-      await fileSave(new Blob([tempSvg.outerHTML], { type: "image/svg+xml" }), {
-        fileName: `${name}.svg`,
-        extensions: [".svg"],
-      });
-      return;
+      return await fileSave(
+        new Blob([tempSvg.outerHTML], { type: MIME_TYPES.svg }),
+        {
+          description: "Export to SVG",
+          name,
+          extension: "svg",
+          fileHandle,
+        },
+      );
     } else if (type === "clipboard-svg") {
-      copyTextToSystemClipboard(tempSvg.outerHTML);
+      await copyTextToSystemClipboard(tempSvg.outerHTML);
       return;
     }
   }
 
-  const tempCanvas = exportToCanvas(elements, appState, {
+  const tempCanvas = await exportToCanvas(elements, appState, files, {
     exportBackground,
     viewBackgroundColor,
     exportPadding,
-    scale,
-    shouldAddWatermark,
   });
   tempCanvas.style.display = "none";
   document.body.appendChild(tempCanvas);
@@ -79,24 +77,25 @@ export const exportCanvas = async (
   tempCanvas.remove();
 
   if (type === "png") {
-    const fileName = `${name}.png`;
     if (appState.exportEmbedScene) {
       blob = await (
         await import(/* webpackChunkName: "image" */ "./image")
       ).encodePngMetadata({
         blob,
-        metadata: serializeAsJSON(elements, appState),
+        metadata: serializeAsJSON(elements, appState, files, "local"),
       });
     }
 
-    await fileSave(blob, {
-      fileName,
-      extensions: [".png"],
+    return await fileSave(blob, {
+      description: "Export to PNG",
+      name,
+      extension: "png",
+      fileHandle,
     });
   } else if (type === "clipboard") {
     try {
       await copyBlobToClipboardAsPng(blob);
-    } catch (error) {
+    } catch (error: any) {
       if (error.name === "CANVAS_POSSIBLY_TOO_BIG") {
         throw error;
       }

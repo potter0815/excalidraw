@@ -1,4 +1,3 @@
-import React from "react";
 import ReactDOM from "react-dom";
 import { render } from "./test-utils";
 import App from "../components/App";
@@ -17,7 +16,7 @@ beforeEach(async () => {
   mouse.reset();
 
   await setLanguage(defaultLang);
-  render(<App />);
+  await render(<App />);
 });
 
 const createAndSelectOneRectangle = (angle: number = 0) => {

@@ -11,6 +11,8 @@ export const hasBackground = (type: string) =>
   type === "diamond" ||
   type === "line";
 
+export const hasStrokeColor = (type: string) => type !== "image";
+
 export const hasStrokeWidth = (type: string) =>
   type === "rectangle" ||
   type === "ellipse" ||
@@ -27,7 +29,10 @@ export const hasStrokeStyle = (type: string) =>
   type === "line";
 
 export const canChangeSharpness = (type: string) =>
-  type === "rectangle" || type === "arrow" || type === "line";
+  type === "rectangle" ||
+  type === "arrow" ||
+  type === "line" ||
+  type === "diamond";
 
 export const hasText = (type: string) => type === "text";
 

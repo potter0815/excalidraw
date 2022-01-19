@@ -20,6 +20,15 @@ const readFile = util.promisify(fs.readFile);
 const { h } = window;
 
 export class API {
+  static setSelectedElements = (elements: ExcalidrawElement[]) => {
+    h.setState({
+      selectedElementIds: elements.reduce((acc, element) => {
+        acc[element.id] = true;
+        return acc;
+      }, {} as Record<ExcalidrawElement["id"], true>),
+    });
+  };
+
   static getSelectedElements = (): ExcalidrawElement[] => {
     return h.elements.filter(
       (element) => h.state.selectedElementIds[element.id],
@@ -48,7 +57,7 @@ export class API {
   };
 
   static createElement = <
-    T extends Exclude<ExcalidrawElement["type"], "selection">
+    T extends Exclude<ExcalidrawElement["type"], "selection">,
   >({
     type,
     id,
@@ -85,6 +94,10 @@ export class API {
     verticalAlign?: T extends "text"
       ? ExcalidrawTextElement["verticalAlign"]
       : never;
+    boundElements?: ExcalidrawGenericElement["boundElements"];
+    containerId?: T extends "text"
+      ? ExcalidrawTextElement["containerId"]
+      : never;
   }): T extends "arrow" | "line"
     ? ExcalidrawLinearElement
     : T extends "freedraw"
@@ -109,6 +122,7 @@ export class API {
         rest.strokeSharpness ?? appState.currentItemStrokeSharpness,
       roughness: rest.roughness ?? appState.currentItemRoughness,
       opacity: rest.opacity ?? appState.currentItemOpacity,
+      boundElements: rest.boundElements ?? null,
     };
     switch (type) {
       case "rectangle":
@@ -129,7 +143,10 @@ export class API {
           fontFamily: rest.fontFamily ?? appState.currentItemFontFamily,
           textAlign: rest.textAlign ?? appState.currentItemTextAlign,
           verticalAlign: rest.verticalAlign ?? DEFAULT_VERTICAL_ALIGN,
+          containerId: rest.containerId ?? undefined,
         });
+        element.width = width;
+        element.height = height;
         break;
       case "freedraw":
         element = newFreeDrawElement({
@@ -186,7 +203,7 @@ export class API {
           resolve(reader.result as string);
         };
         reader.readAsText(blob);
-      } catch (error) {
+      } catch (error: any) {
         reject(error);
       }
     });

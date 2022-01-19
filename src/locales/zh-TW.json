@@ -35,11 +35,12 @@
     "arrowhead_arrow": "箭頭",
     "arrowhead_bar": "塊",
     "arrowhead_dot": "點",
+    "arrowhead_triangle": "三角形",
     "fontSize": "字型大小",
     "fontFamily": "字體",
     "onlySelected": "僅選取物件",
-    "withBackground": "包含背景",
-    "exportEmbedScene": "在輸出的檔案中嵌入場景",
+    "withBackground": "背景",
+    "exportEmbedScene": "嵌入場景",
     "exportEmbedScene_details": "用於回復場景的場景資料會被包含在輸出的 PNG/SVG 檔案中。\n會增加輸出的檔案大小。",
     "addWatermark": "加上 \"Made with Excalidraw\"",
     "handDrawn": "手寫",
@@ -96,17 +97,26 @@
     "flipVertical": "垂直翻轉",
     "viewMode": "檢視模式",
     "toggleExportColorScheme": "切換輸出配色",
-    "share": "共享"
+    "share": "共享",
+    "showStroke": "顯示線條檢色器",
+    "showBackground": "顯示背景檢色器",
+    "toggleTheme": "切換主題",
+    "personalLib": "個人資料庫",
+    "excalidrawLib": "Excalidraw 資料庫",
+    "decreaseFontSize": "縮小文字",
+    "increaseFontSize": "放大文字"
   },
   "buttons": {
     "clearReset": "重置 canvas",
+    "exportJSON": "匯出至檔案",
+    "exportImage": "另存為圖片",
     "export": "輸出",
     "exportToPng": "輸出成 PNG",
     "exportToSvg": "輸出成 SVG",
     "copyToClipboard": "複製至剪貼簿",
     "copyPngToClipboard": "複製 PNG 至剪貼簿",
     "scale": "縮放比例",
-    "save": "儲存",
+    "save": "儲存目前檔案",
     "saveAs": "儲存為",
     "load": "載入",
     "getShareableLink": "取得共享連結",
@@ -127,7 +137,13 @@
     "darkMode": "深色模式",
     "lightMode": "淺色模式",
     "zenMode": "專注模式",
-    "exitZenMode": "離開專注模式"
+    "exitZenMode": "離開專注模式",
+    "cancel": "取消",
+    "clear": "清除",
+    "remove": "刪除",
+    "publishLibrary": "發布",
+    "submit": "送出",
+    "confirm": "確認"
   },
   "alerts": {
     "clearReset": "這將會清除整個 canvas。你確定嗎？",
@@ -145,19 +161,29 @@
     "errorAddingToLibrary": "無法於此資料庫加入項目",
     "errorRemovingFromLibrary": "無法由此資料庫移除項目",
     "confirmAddLibrary": "這將會將 {{numShapes}} 個圖形加入你的資料庫，你確定嗎？",
-    "imageDoesNotContainScene": "目前尚不支援載入圖片。\n您是否要載入場景？此圖片中並無任何場景資料，輸出時是否有選擇包含？",
+    "imageDoesNotContainScene": "此圖檔中未包含場景資料。輸出檔案時是否有包含場景資料？",
     "cannotRestoreFromImage": "無法由此檔案回復場景。",
     "invalidSceneUrl": "無法由提供的 URL 匯入場景。可能是發生異常，或未包含有效的 Excalidraw JSON 資料。",
-    "resetLibrary": "這會清除您的資料庫，是否確定？"
+    "resetLibrary": "這會清除您的資料庫，是否確定？",
+    "removeItemsFromsLibrary": "從資料庫刪除 {{count}} 項？",
+    "invalidEncryptionKey": "加密鍵必須為22字元。即時協作已停用。"
+  },
+  "errors": {
+    "unsupportedFileType": "不支援的檔案類型。",
+    "imageInsertError": "無法插入圖片。請稍後再試…",
+    "fileTooBig": "檔案過大。可接受的最大尺寸為 {{maxSize}} 。",
+    "svgImageInsertError": "無法插入 SVG 圖片。此 SVG 檔案有問題。",
+    "invalidSVGString": "無效的 SVG。"
   },
   "toolBar": {
     "selection": "選取",
-    "freedraw": "繪圖",
+    "image": "插入圖片",
     "rectangle": "長方形",
     "diamond": "菱形",
     "ellipse": "橢圓",
     "arrow": "箭頭",
     "line": "線條",
+    "freedraw": "繪圖",
     "text": "文字",
     "library": "資料庫",
     "lock": "可連續使用選取的工具"
@@ -168,16 +194,24 @@
     "shapes": "形狀"
   },
   "hints": {
+    "canvasPanning": "若要移動畫布，請在拖曳時按住滑鼠滾輪或空白鍵",
     "linearElement": "點擊以繪製多點曲線；或拖曳以繪製直線",
     "freeDraw": "點擊並拖曳來繪圖，放開即結束",
     "text": "提示：亦可使用選取工具在任何地方雙擊來加入文字",
+    "text_selected": "雙擊滑鼠或按 Enter 以編輯文字",
+    "text_editing": "按跳脫鍵或 Ctrl 或 Cmd + Enter 以結束編輯",
     "linearElementMulti": "按下 Escape 或 Enter 以結束繪製",
     "lockAngle": "按住 SHIFT 可限制旋轉角度",
     "resize": "縮放時按住 Shift 可保持原比例縮放；\\n按住 Alt 可由中心點進行縮放",
+    "resizeImage": "按住 SHIFT 可任意縮放，按住 ALT 可由中央縮放。",
     "rotate": "旋轉時按住 Shift 可限制旋轉角度",
     "lineEditor_info": "雙擊滑鼠左鍵或按 Enter 來編輯控制點",
     "lineEditor_pointSelected": "按下 Delete 可移除錨點；Ctrl 或 Cmd + D 可複製；或可拖曳來移動",
-    "lineEditor_nothingSelected": "點選想移動或刪除的控制點；或按住 Alt 再點擊以增加新控制點"
+    "lineEditor_nothingSelected": "選擇要編輯的錨點（按住 SHIFT 可多選），\n或按住 Alt 並點擊以增加新錨點。",
+    "placeImage": "點擊以放置圖片，或點擊並拖曳以手動調整其尺寸。",
+    "publishLibrary": "發布個人資料庫",
+    "bindTextToElement": "按下 Enter 以加入文字。",
+    "deepBoxSelect": "按住 Ctrl 或 Cmd 以深度選取並避免拖曳"
   },
   "canvasError": {
     "cannotShowPreview": "無法顯示預覽",
@@ -210,30 +244,96 @@
   "errorDialog": {
     "title": "錯誤"
   },
+  "exportDialog": {
+    "disk_title": "儲存至硬碟",
+    "disk_details": "將場景匯出為可供匯入之檔案",
+    "disk_button": "儲存至檔案",
+    "link_title": "可共享連結",
+    "link_details": "匯出為唯讀連結",
+    "link_button": "匯出為連結",
+    "excalidrawplus_description": "將此場景儲存至你的 Excalidraw+ 工作區",
+    "excalidrawplus_button": "輸出",
+    "excalidrawplus_exportError": "目前無法輸出至 Excalidraw+"
+  },
   "helpDialog": {
     "blog": "閱讀部落格",
     "click": "點擊",
+    "deepSelect": "深度選取",
+    "deepBoxSelect": "在容器內深度選取並避免拖曳",
     "curvedArrow": "曲箭頭",
     "curvedLine": "曲線",
     "documentation": "文件",
+    "doubleClick": "雙擊",
     "drag": "拖曳",
     "editor": "編輯器",
+    "editSelectedShape": "編輯選定的形狀（文字/箭號/線條）",
     "github": "發現異常？回報問題",
     "howto": "參照我們的說明",
     "or": "或",
     "preventBinding": "避免箭號連結",
     "shapes": "形狀",
     "shortcuts": "鍵盤快速鍵",
-    "textFinish": "完成編輯 (文字)",
-    "textNewLine": "換行 (文字)",
+    "textFinish": "完成編輯（文字編輯器）",
+    "textNewLine": "換行（文字編輯器）",
     "title": "說明",
     "view": "檢視",
     "zoomToFit": "放大至填滿畫面",
     "zoomToSelection": "縮放至選取區"
   },
+  "clearCanvasDialog": {
+    "title": "清除畫布"
+  },
+  "publishDialog": {
+    "title": "發布資料庫",
+    "itemName": "項目名稱",
+    "authorName": "作者名稱",
+    "githubUsername": "GitHub 帳號",
+    "twitterUsername": "Twitter 帳號",
+    "libraryName": "資料庫名稱",
+    "libraryDesc": "資料庫說明",
+    "website": "網站",
+    "placeholder": {
+      "authorName": "您的名稱或帳號",
+      "libraryName": "您的資料庫名稱",
+      "libraryDesc": "提供您的資料庫說明以利他人理解其用途",
+      "githubHandle": "Github handle（選填），填寫後您可編輯已送出待審查的資料庫",
+      "twitterHandle": "Twitter 帳號（選填），填寫後若我們在 Twitter 推廣時可提及您",
+      "website": "您個人網站或其他網站的連結（選填）"
+    },
+    "errors": {
+      "required": "必填",
+      "website": "請輸入有效的 URL"
+    },
+    "noteDescription": {
+      "pre": "送出您的資料庫後將被包含於",
+      "link": "公開資料庫 repository",
+      "post": "以利他人在其繪圖中使用。"
+    },
+    "noteGuidelines": {
+      "pre": "資料庫需先經人工審查。請閱讀",
+      "link": "說明文件",
+      "post": "再送出。若需溝通與修改時要透過 GitHub 帳號來進行，但並非強制需求。"
+    },
+    "noteLicense": {
+      "pre": "送出即代表您同意此資料庫將發布時使用 ",
+      "link": "MIT 授權，",
+      "post": "簡單來說是指任何人都能不受限制的使用。"
+    },
+    "noteItems": "每個資料庫項目都有獨立的名稱故可篩選。會包含下列資料庫項目：",
+    "atleastOneLibItem": "請選擇至少一項資料庫項目"
+  },
+  "publishSuccessDialog": {
+    "title": "資料庫已送出",
+    "content": "感謝 {{authorName}} 。您的資料庫已送出待審查。您可查看目前狀態",
+    "link": "在此"
+  },
+  "confirmDialog": {
+    "resetLibrary": "重設資料庫",
+    "removeItemsFromLib": "從資料庫移除所選的項目"
+  },
   "encrypted": {
     "tooltip": "你的作品已使用 end-to-end 方式加密，Excalidraw 的伺服器也無法取得其內容。",
-    "link": ""
+    "link": "Excalidraw 端到端加密的相關部落格文章"
   },
   "stats": {
     "angle": "角度",
@@ -251,6 +351,7 @@
     "width": "寬度"
   },
   "toast": {
+    "addedToLibrary": "加入資料庫",
     "copyStyles": "已複製樣式",
     "copyToClipboard": "複製至剪貼簿。",
     "copyToClipboardAsPng": "以 PNG 格式將 {{exportSelection}} 複製至剪貼簿\n({{exportColorScheme}})",
@@ -258,5 +359,52 @@
     "fileSavedToFilename": "儲存為 {filename}",
     "canvas": "畫布",
     "selection": "已選項目"
+  },
+  "colors": {
+    "ffffff": "白",
+    "f8f9fa": "灰 0",
+    "f1f3f5": "灰 1",
+    "fff5f5": "紅 0",
+    "fff0f6": "粉紅 0",
+    "f8f0fc": "深紫 0",
+    "f3f0ff": "藍紫 0",
+    "edf2ff": "靛藍 0",
+    "e7f5ff": "藍 0",
+    "e3fafc": "青 0",
+    "e6fcf5": "藍綠 0",
+    "ebfbee": "綠 0",
+    "f4fce3": "黃綠 0",
+    "fff9db": "黃 0",
+    "fff4e6": "橘 0",
+    "transparent": "透明",
+    "ced4da": "灰 4",
+    "868e96": "灰 6",
+    "fa5252": "紅 6",
+    "e64980": "粉紅 6",
+    "be4bdb": "深紫 6",
+    "7950f2": "藍紫 6",
+    "4c6ef5": "靛藍 6",
+    "228be6": "藍 6",
+    "15aabf": "青 6",
+    "12b886": "藍綠 6",
+    "40c057": "綠 6",
+    "82c91e": "黃綠 6",
+    "fab005": "黃 6",
+    "fd7e14": "橘 6",
+    "000000": "黑",
+    "343a40": "灰 8",
+    "495057": "灰 7",
+    "c92a2a": "紅 9",
+    "a61e4d": "粉紅 9",
+    "862e9c": "深紫 9",
+    "5f3dc4": "藍紫 9",
+    "364fc7": "靛藍 9",
+    "1864ab": "藍 9",
+    "0b7285": "青 9",
+    "087f5b": "藍綠 9",
+    "2b8a3e": "綠 9",
+    "5c940d": "黃綠 9",
+    "e67700": "黃 9",
+    "d9480f": "橘 9"
   }
 }

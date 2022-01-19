@@ -70,6 +70,8 @@ The first set of digits is the room. This is visible from the server that’s go
 
 The second set of digits is the encryption key. The Excalidraw server doesn’t know about it. This is what all the participants use to encrypt/decrypt the messages.
 
+> Note: Please ensure that the encryption key is 22 characters long.
+
 ## Shape libraries
 
 Find a growing list of libraries containing assets for your drawings at [libraries.excalidraw.com](https://libraries.excalidraw.com).
@@ -93,7 +95,7 @@ These instructions will get you a copy of the project up and running on your loc
 #### Requirements
 
 - [Node.js](https://nodejs.org/en/)
-- [Yarn](https://yarnpkg.com/getting-started/install)
+- [Yarn](https://yarnpkg.com/getting-started/install) (v1 or v2.4.2+)
 - [Git](https://git-scm.com/downloads)
 
 #### Clone the repo
@@ -115,6 +117,10 @@ yarn start
 ```
 
 Now you can open [http://localhost:3000](http://localhost:3000) and start coding in your favorite code editor.
+
+#### Collaboration
+
+For collaboration, you will need to set up [collab server](https://github.com/excalidraw/excalidraw-room) in local.
 
 #### Commands
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { ActionManager } from "../actions/manager";
 import { getNonDeletedElements } from "../element";
-import { ExcalidrawElement } from "../element/types";
+import { ExcalidrawElement, PointerType } from "../element/types";
 import { t } from "../i18n";
 import { useIsMobile } from "../components/App";
 import {
@@ -18,6 +18,7 @@ import { AppState, Zoom } from "../types";
 import { capitalizeString, isTransparent, setCursorForShape } from "../utils";
 import Stack from "./Stack";
 import { ToolButton } from "./ToolButton";
+import { hasStrokeColor } from "../scene/comparisons";
 
 export const SelectedShapeActions = ({
   appState,
@@ -48,9 +49,22 @@ export const SelectedShapeActions = ({
     hasBackground(elementType) ||
     targetElements.some((element) => hasBackground(element.type));
 
+  let commonSelectedType: string | null = targetElements[0]?.type || null;
+
+  for (const element of targetElements) {
+    if (element.type !== commonSelectedType) {
+      commonSelectedType = null;
+      break;
+    }
+  }
+
   return (
     <div className="panelColumn">
-      {renderAction("changeStrokeColor")}
+      {((hasStrokeColor(elementType) &&
+        elementType !== "image" &&
+        commonSelectedType !== "image") ||
+        targetElements.some((element) => hasStrokeColor(element.type))) &&
+        renderAction("changeStrokeColor")}
       {showChangeBackgroundIcons && renderAction("changeBackgroundColor")}
       {showFillIcons && renderAction("changeFillStyle")}
 
@@ -151,31 +165,24 @@ export const SelectedShapeActions = ({
   );
 };
 
-const LIBRARY_ICON = (
-  // fa-th-large
-  <svg viewBox="0 0 512 512">
-    <path d="M296 32h192c13.255 0 24 10.745 24 24v160c0 13.255-10.745 24-24 24H296c-13.255 0-24-10.745-24-24V56c0-13.255 10.745-24 24-24zm-80 0H24C10.745 32 0 42.745 0 56v160c0 13.255 10.745 24 24 24h192c13.255 0 24-10.745 24-24V56c0-13.255-10.745-24-24-24zM0 296v160c0 13.255 10.745 24 24 24h192c13.255 0 24-10.745 24-24V296c0-13.255-10.745-24-24-24H24c-13.255 0-24 10.745-24 24zm296 184h192c13.255 0 24-10.745 24-24V296c0-13.255-10.745-24-24-24H296c-13.255 0-24 10.745-24 24v160c0 13.255 10.745 24 24 24z" />
-  </svg>
-);
-
 export const ShapesSwitcher = ({
   canvas,
   elementType,
   setAppState,
-  isLibraryOpen,
+  onImageAction,
 }: {
   canvas: HTMLCanvasElement | null;
   elementType: ExcalidrawElement["type"];
   setAppState: React.Component<any, AppState>["setState"];
-  isLibraryOpen: boolean;
+  onImageAction: (data: { pointerType: PointerType | null }) => void;
 }) => (
   <>
     {SHAPES.map(({ value, icon, key }, index) => {
       const label = t(`toolBar.${value}`);
-      const letter = typeof key === "string" ? key : key[0];
-      const shortcut = `${capitalizeString(letter)} ${t("helpDialog.or")} ${
-        index + 1
-      }`;
+      const letter = key && (typeof key === "string" ? key : key[0]);
+      const shortcut = letter
+        ? `${capitalizeString(letter)} ${t("helpDialog.or")} ${index + 1}`
+        : `${index + 1}`;
       return (
         <ToolButton
           className="Shape"
@@ -189,31 +196,20 @@ export const ShapesSwitcher = ({
           aria-label={capitalizeString(label)}
           aria-keyshortcuts={shortcut}
           data-testid={value}
-          onChange={() => {
+          onChange={({ pointerType }) => {
             setAppState({
               elementType: value,
               multiElement: null,
               selectedElementIds: {},
             });
             setCursorForShape(canvas, value);
-            setAppState({});
+            if (value === "image") {
+              onImageAction({ pointerType });
+            }
           }}
         />
       );
     })}
-    <ToolButton
-      className="Shape ToolIcon_type_button__library"
-      type="button"
-      icon={LIBRARY_ICON}
-      name="editor-library"
-      keyBindingLabel="9"
-      aria-keyshortcuts="9"
-      title={`${capitalizeString(t("toolBar.library"))} — 9`}
-      aria-label={capitalizeString(t("toolBar.library"))}
-      onClick={() => {
-        setAppState({ isLibraryOpen: !isLibraryOpen });
-      }}
-    />
   </>
 );
 
@@ -226,12 +222,9 @@ export const ZoomActions = ({
 }) => (
   <Stack.Col gap={1}>
     <Stack.Row gap={1} align="center">
-      {renderAction("zoomIn")}
       {renderAction("zoomOut")}
+      {renderAction("zoomIn")}
       {renderAction("resetZoom")}
-      <div style={{ marginInlineStart: 4 }}>
-        {(zoom.value * 100).toFixed(0)}%
-      </div>
     </Stack.Row>
   </Stack.Col>
 );

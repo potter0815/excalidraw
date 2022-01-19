@@ -1,4 +1,3 @@
-import React from "react";
 import ReactDOM from "react-dom";
 import { render } from "./test-utils";
 import App from "../components/App";
@@ -9,7 +8,10 @@ import {
   getTransformHandles,
   TransformHandleDirection,
 } from "../element/transformHandles";
-import { ExcalidrawElement } from "../element/types";
+import { ExcalidrawElement, ExcalidrawTextElement } from "../element/types";
+import ExcalidrawApp from "../excalidraw-app";
+import { API } from "./helpers/api";
+import { KEYS } from "../keys";
 
 const mouse = new Pointer("mouse");
 
@@ -45,14 +47,17 @@ describe("resize rectangle ellipses and diamond elements", () => {
     ${"se"} | ${[-30, -10]}   | ${[70, 90]}   | ${[elemData.x, elemData.y]}
     ${"nw"} | ${[-300, -200]} | ${[400, 300]} | ${[-300, -200]}
     ${"sw"} | ${[40, -20]}    | ${[60, 80]}   | ${[40, 0]}
-  `("resizes with handle $handle", ({ handle, move, dimensions, topLeft }) => {
-    render(<App />);
-    const rectangle = UI.createElement("rectangle", elemData);
-    resize(rectangle, handle, move);
-    const element = h.elements[0];
-    expect([element.width, element.height]).toEqual(dimensions);
-    expect([element.x, element.y]).toEqual(topLeft);
-  });
+  `(
+    "resizes with handle $handle",
+    async ({ handle, move, dimensions, topLeft }) => {
+      await render(<App />);
+      const rectangle = UI.createElement("rectangle", elemData);
+      resize(rectangle, handle, move);
+      const element = h.elements[0];
+      expect([element.width, element.height]).toEqual(dimensions);
+      expect([element.x, element.y]).toEqual(topLeft);
+    },
+  );
 
   it.each`
     handle  | move            | dimensions    | topLeft
@@ -61,8 +66,8 @@ describe("resize rectangle ellipses and diamond elements", () => {
     ${"sw"} | ${[40, -20]}    | ${[80, 80]}   | ${[20, 0]}
   `(
     "resizes with fixed side ratios on handle $handle",
-    ({ handle, move, dimensions, topLeft }) => {
-      render(<App />);
+    async ({ handle, move, dimensions, topLeft }) => {
+      await render(<App />);
       const rectangle = UI.createElement("rectangle", elemData);
       resize(rectangle, handle, move, { shift: true });
       const element = h.elements[0];
@@ -79,8 +84,8 @@ describe("resize rectangle ellipses and diamond elements", () => {
     ${"n"}  | ${[_, 150]}    | ${[50, 50]}   | ${[25, 100]}
   `(
     "Flips while resizing and keeping side ratios on handle $handle",
-    ({ handle, move, dimensions, topLeft }) => {
-      render(<App />);
+    async ({ handle, move, dimensions, topLeft }) => {
+      await render(<App />);
       const rectangle = UI.createElement("rectangle", elemData);
       resize(rectangle, handle, move, { shift: true });
       const element = h.elements[0];
@@ -95,8 +100,8 @@ describe("resize rectangle ellipses and diamond elements", () => {
     ${"s"}  | ${[_, -20]}   | ${[100, 60]}  | ${[0, 20]}
   `(
     "Resizes from center on handle $handle",
-    ({ handle, move, dimensions, topLeft }) => {
-      render(<App />);
+    async ({ handle, move, dimensions, topLeft }) => {
+      await render(<App />);
       const rectangle = UI.createElement("rectangle", elemData);
       resize(rectangle, handle, move, { alt: true });
       const element = h.elements[0];
@@ -111,8 +116,8 @@ describe("resize rectangle ellipses and diamond elements", () => {
     ${"e"}  | ${[-130, _]}  | ${[160, 160]} | ${[-30, -30]}
   `(
     "Resizes from center, flips and keeps side rations on handle $handle",
-    ({ handle, move, dimensions, topLeft }) => {
-      render(<App />);
+    async ({ handle, move, dimensions, topLeft }) => {
+      await render(<App />);
       const rectangle = UI.createElement("rectangle", elemData);
       resize(rectangle, handle, move, { alt: true, shift: true });
       const element = h.elements[0];
@@ -141,3 +146,31 @@ const resize = (
     mouse.up();
   });
 };
+
+describe("Test text element", () => {
+  it("should update font size via keyboard", async () => {
+    await render(<ExcalidrawApp />);
+
+    const textElement = API.createElement({
+      type: "text",
+      text: "abc",
+    });
+
+    window.h.elements = [textElement];
+
+    API.setSelectedElements([textElement]);
+
+    const origFontSize = textElement.fontSize;
+
+    Keyboard.withModifierKeys({ shift: true, ctrl: true }, () => {
+      Keyboard.keyDown(KEYS.CHEVRON_RIGHT);
+      expect((window.h.elements[0] as ExcalidrawTextElement).fontSize).toBe(
+        origFontSize * 1.1,
+      );
+      Keyboard.keyDown(KEYS.CHEVRON_LEFT);
+      expect((window.h.elements[0] as ExcalidrawTextElement).fontSize).toBe(
+        origFontSize,
+      );
+    });
+  });
+});

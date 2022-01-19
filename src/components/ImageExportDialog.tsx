@@ -8,20 +8,17 @@ import { CanvasError } from "../errors";
 import { t } from "../i18n";
 import { useIsMobile } from "./App";
 import { getSelectedElements, isSomeElementSelected } from "../scene";
-import { exportToCanvas, getExportSize } from "../scene/export";
-import { AppState } from "../types";
+import { exportToCanvas } from "../scene/export";
+import { AppState, BinaryFiles } from "../types";
 import { Dialog } from "./Dialog";
 import { clipboard, exportImage } from "./icons";
 import Stack from "./Stack";
 import { ToolButton } from "./ToolButton";
-
 import "./ExportDialog.scss";
-import { supported as fsSupported } from "browser-fs-access";
 import OpenColor from "open-color";
 import { CheckboxItem } from "./CheckboxItem";
-
-const scales = [1, 2, 3];
-const defaultScale = scales.includes(devicePixelRatio) ? devicePixelRatio : 1;
+import { DEFAULT_EXPORT_PADDING } from "../constants";
+import { nativeFileSystemSupported } from "../data/filesystem";
 
 const supportsContextFilters =
   "filter" in document.createElement("canvas").getContext("2d")!;
@@ -82,7 +79,8 @@ const ExportButton: React.FC<{
 const ImageExportModal = ({
   elements,
   appState,
-  exportPadding = 10,
+  files,
+  exportPadding = DEFAULT_EXPORT_PADDING,
   actionManager,
   onExportToPng,
   onExportToSvg,
@@ -90,6 +88,7 @@ const ImageExportModal = ({
 }: {
   appState: AppState;
   elements: readonly NonDeletedExcalidrawElement[];
+  files: BinaryFiles;
   exportPadding?: number;
   actionManager: ActionsManagerInterface;
   onExportToPng: ExportCB;
@@ -98,17 +97,12 @@ const ImageExportModal = ({
   onCloseRequest: () => void;
 }) => {
   const someElementIsSelected = isSomeElementSelected(elements, appState);
-  const [scale, setScale] = useState(defaultScale);
   const [exportSelected, setExportSelected] = useState(someElementIsSelected);
   const previewRef = useRef<HTMLDivElement>(null);
-  const {
-    exportBackground,
-    viewBackgroundColor,
-    shouldAddWatermark,
-  } = appState;
+  const { exportBackground, viewBackgroundColor } = appState;
 
   const exportedElements = exportSelected
-    ? getSelectedElements(elements, appState)
+    ? getSelectedElements(elements, appState, true)
     : elements;
 
   useEffect(() => {
@@ -120,37 +114,29 @@ const ImageExportModal = ({
     if (!previewNode) {
       return;
     }
-    try {
-      const canvas = exportToCanvas(exportedElements, appState, {
-        exportBackground,
-        viewBackgroundColor,
-        exportPadding,
-        scale,
-        shouldAddWatermark,
-      });
-
-      // if converting to blob fails, there's some problem that will
-      // likely prevent preview and export (e.g. canvas too big)
-      canvasToBlob(canvas)
-        .then(() => {
+    exportToCanvas(exportedElements, appState, files, {
+      exportBackground,
+      viewBackgroundColor,
+      exportPadding,
+    })
+      .then((canvas) => {
+        // if converting to blob fails, there's some problem that will
+        // likely prevent preview and export (e.g. canvas too big)
+        return canvasToBlob(canvas).then(() => {
           renderPreview(canvas, previewNode);
-        })
-        .catch((error) => {
-          console.error(error);
-          renderPreview(new CanvasError(), previewNode);
         });
-    } catch (error) {
-      console.error(error);
-      renderPreview(new CanvasError(), previewNode);
-    }
+      })
+      .catch((error) => {
+        console.error(error);
+        renderPreview(new CanvasError(), previewNode);
+      });
   }, [
     appState,
+    files,
     exportedElements,
     exportBackground,
     exportPadding,
     viewBackgroundColor,
-    scale,
-    shouldAddWatermark,
   ]);
 
   return (
@@ -181,34 +167,8 @@ const ImageExportModal = ({
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", marginTop: ".6em" }}>
-        <Stack.Row gap={2} justifyContent={"center"}>
-          {scales.map((_scale) => {
-            const [width, height] = getExportSize(
-              exportedElements,
-              exportPadding,
-              shouldAddWatermark,
-              _scale,
-            );
-
-            const scaleButtonTitle = `${t(
-              "buttons.scale",
-            )} ${_scale}x (${width}x${height})`;
-
-            return (
-              <ToolButton
-                key={_scale}
-                size="s"
-                type="radio"
-                icon={`${_scale}x`}
-                name="export-canvas-scale"
-                title={scaleButtonTitle}
-                aria-label={scaleButtonTitle}
-                id="export-canvas-scale"
-                checked={_scale === scale}
-                onChange={() => setScale(_scale)}
-              />
-            );
-          })}
+        <Stack.Row gap={2}>
+          {actionManager.renderAction("changeExportScale")}
         </Stack.Row>
         <p style={{ marginLeft: "1em", userSelect: "none" }}>Scale</p>
       </div>
@@ -220,14 +180,15 @@ const ImageExportModal = ({
           margin: ".6em 0",
         }}
       >
-        {!fsSupported && actionManager.renderAction("changeProjectName")}
+        {!nativeFileSystemSupported &&
+          actionManager.renderAction("changeProjectName")}
       </div>
       <Stack.Row gap={2} justifyContent="center" style={{ margin: "2em 0" }}>
         <ExportButton
           color="indigo"
           title={t("buttons.exportToPng")}
           aria-label={t("buttons.exportToPng")}
-          onClick={() => onExportToPng(exportedElements, scale)}
+          onClick={() => onExportToPng(exportedElements)}
         >
           PNG
         </ExportButton>
@@ -235,14 +196,14 @@ const ImageExportModal = ({
           color="red"
           title={t("buttons.exportToSvg")}
           aria-label={t("buttons.exportToSvg")}
-          onClick={() => onExportToSvg(exportedElements, scale)}
+          onClick={() => onExportToSvg(exportedElements)}
         >
           SVG
         </ExportButton>
         {probablySupportsClipboardBlob && (
           <ExportButton
             title={t("buttons.copyPngToClipboard")}
-            onClick={() => onExportToClipboard(exportedElements, scale)}
+            onClick={() => onExportToClipboard(exportedElements)}
             color="gray"
             shade={7}
           >
@@ -257,7 +218,8 @@ const ImageExportModal = ({
 export const ImageExportDialog = ({
   elements,
   appState,
-  exportPadding = 10,
+  files,
+  exportPadding = DEFAULT_EXPORT_PADDING,
   actionManager,
   onExportToPng,
   onExportToSvg,
@@ -265,6 +227,7 @@ export const ImageExportDialog = ({
 }: {
   appState: AppState;
   elements: readonly NonDeletedExcalidrawElement[];
+  files: BinaryFiles;
   exportPadding?: number;
   actionManager: ActionsManagerInterface;
   onExportToPng: ExportCB;
@@ -295,6 +258,7 @@ export const ImageExportDialog = ({
           <ImageExportModal
             elements={elements}
             appState={appState}
+            files={files}
             exportPadding={exportPadding}
             actionManager={actionManager}
             onExportToPng={onExportToPng}

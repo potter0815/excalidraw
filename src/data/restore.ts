@@ -1,21 +1,29 @@
 import {
   ExcalidrawElement,
-  FontFamily,
   ExcalidrawSelectionElement,
+  FontFamilyValues,
 } from "../element/types";
-import { AppState, NormalizedZoomValue } from "../types";
+import {
+  AppState,
+  BinaryFiles,
+  LibraryItem,
+  NormalizedZoomValue,
+} from "../types";
 import { ImportedDataState } from "./types";
-import { isInvisiblySmallElement, getNormalizedDimensions } from "../element";
+import { getNormalizedDimensions, isInvisiblySmallElement } from "../element";
 import { isLinearElementType } from "../element/typeChecks";
 import { randomId } from "../random";
 import {
-  FONT_FAMILY,
   DEFAULT_FONT_FAMILY,
   DEFAULT_TEXT_ALIGN,
   DEFAULT_VERTICAL_ALIGN,
+  FONT_FAMILY,
 } from "../constants";
 import { getDefaultAppState } from "../appState";
 import { LinearElementEditor } from "../element/linearElementEditor";
+import { bumpVersion } from "../element/mutateElement";
+import { getUpdatedTimestamp } from "../utils";
+import { arrayToMap } from "../utils";
 
 type RestoredAppState = Omit<
   AppState,
@@ -32,6 +40,7 @@ export const AllowedExcalidrawElementTypes: Record<
   diamond: true,
   ellipse: true,
   line: true,
+  image: true,
   arrow: true,
   freedraw: true,
 };
@@ -39,29 +48,36 @@ export const AllowedExcalidrawElementTypes: Record<
 export type RestoredDataState = {
   elements: ExcalidrawElement[];
   appState: RestoredAppState;
+  files: BinaryFiles;
 };
 
-const getFontFamilyByName = (fontFamilyName: string): FontFamily => {
-  for (const [id, fontFamilyString] of Object.entries(FONT_FAMILY)) {
-    if (fontFamilyString.includes(fontFamilyName)) {
-      return parseInt(id) as FontFamily;
-    }
+const getFontFamilyByName = (fontFamilyName: string): FontFamilyValues => {
+  if (Object.keys(FONT_FAMILY).includes(fontFamilyName)) {
+    return FONT_FAMILY[
+      fontFamilyName as keyof typeof FONT_FAMILY
+    ] as FontFamilyValues;
   }
   return DEFAULT_FONT_FAMILY;
 };
 
 const restoreElementWithProperties = <
   T extends ExcalidrawElement,
-  K extends keyof Omit<
-    Required<T>,
-    Exclude<keyof ExcalidrawElement, "type" | "x" | "y">
-  >
+  K extends Pick<T, keyof Omit<Required<T>, keyof ExcalidrawElement>>,
 >(
-  element: Required<T>,
-  extra: Pick<T, K>,
+  element: Required<T> & {
+    /** @deprecated */
+    boundElementIds?: readonly ExcalidrawElement["id"][];
+  },
+  extra: Pick<
+    T,
+    // This extra Pick<T, keyof K> ensure no excess properties are passed.
+    // @ts-ignore TS complains here but type checks the call sites fine.
+    keyof K
+  > &
+    Partial<Pick<ExcalidrawElement, "type" | "x" | "y">>,
 ): T => {
   const base: Pick<T, keyof ExcalidrawElement> = {
-    type: (extra as Partial<T>).type || element.type,
+    type: extra.type || element.type,
     // all elements must have version > 0 so getSceneVersion() will pick up
     // newly added elements
     version: element.version || 1,
@@ -74,8 +90,8 @@ const restoreElementWithProperties = <
     roughness: element.roughness ?? 1,
     opacity: element.opacity == null ? 100 : element.opacity,
     angle: element.angle || 0,
-    x: (extra as Partial<T>).x ?? element.x ?? 0,
-    y: (extra as Partial<T>).y ?? element.y ?? 0,
+    x: extra.x ?? element.x ?? 0,
+    y: extra.y ?? element.y ?? 0,
     strokeColor: element.strokeColor,
     backgroundColor: element.backgroundColor,
     width: element.width || 0,
@@ -85,28 +101,30 @@ const restoreElementWithProperties = <
     strokeSharpness:
       element.strokeSharpness ??
       (isLinearElementType(element.type) ? "round" : "sharp"),
-    boundElementIds: element.boundElementIds ?? [],
+    boundElements: element.boundElementIds
+      ? element.boundElementIds.map((id) => ({ type: "arrow", id }))
+      : element.boundElements ?? [],
+    updated: element.updated ?? getUpdatedTimestamp(),
   };
 
-  return ({
+  return {
     ...base,
     ...getNormalizedDimensions(base),
     ...extra,
-  } as unknown) as T;
+  } as unknown as T;
 };
 
 const restoreElement = (
   element: Exclude<ExcalidrawElement, ExcalidrawSelectionElement>,
-): typeof element => {
+): typeof element | null => {
   switch (element.type) {
     case "text":
       let fontSize = element.fontSize;
       let fontFamily = element.fontFamily;
       if ("font" in element) {
-        const [fontPx, _fontFamily]: [
-          string,
-          string,
-        ] = (element as any).font.split(" ");
+        const [fontPx, _fontFamily]: [string, string] = (
+          element as any
+        ).font.split(" ");
         fontSize = parseInt(fontPx, 10);
         fontFamily = getFontFamilyByName(_fontFamily);
       }
@@ -117,6 +135,8 @@ const restoreElement = (
         baseline: element.baseline,
         textAlign: element.textAlign || DEFAULT_TEXT_ALIGN,
         verticalAlign: element.verticalAlign || DEFAULT_VERTICAL_ALIGN,
+        containerId: element.containerId ?? null,
+        originalText: element.originalText || element.text,
       });
     case "freedraw": {
       return restoreElementWithProperties(element, {
@@ -126,6 +146,12 @@ const restoreElement = (
         pressures: element.pressures,
       });
     }
+    case "image":
+      return restoreElementWithProperties(element, {
+        status: element.status || "pending",
+        fileId: element.fileId,
+        scale: element.scale || [1, 1],
+      });
     case "line":
     // @ts-ignore LEGACY type
     // eslint-disable-next-line no-fallthrough
@@ -181,13 +207,20 @@ const restoreElement = (
 
 export const restoreElements = (
   elements: ImportedDataState["elements"],
+  /** NOTE doesn't serve for reconciliation */
+  localElements: readonly ExcalidrawElement[] | null | undefined,
 ): ExcalidrawElement[] => {
+  const localElementsMap = localElements ? arrayToMap(localElements) : null;
   return (elements || []).reduce((elements, element) => {
     // filtering out selection, which is legacy, no longer kept in elements,
     // and causing issues if retained
     if (element.type !== "selection" && !isInvisiblySmallElement(element)) {
-      const migratedElement = restoreElement(element);
+      let migratedElement: ExcalidrawElement | null = restoreElement(element);
       if (migratedElement) {
+        const localElement = localElementsMap?.get(element.id);
+        if (localElement && localElement.version > migratedElement.version) {
+          migratedElement = bumpVersion(migratedElement, localElement.version);
+        }
         elements.push(migratedElement);
       }
     }
@@ -197,25 +230,25 @@ export const restoreElements = (
 
 export const restoreAppState = (
   appState: ImportedDataState["appState"],
-  localAppState: Partial<AppState> | null,
+  localAppState: Partial<AppState> | null | undefined,
 ): RestoredAppState => {
   appState = appState || {};
 
   const defaultAppState = getDefaultAppState();
   const nextAppState = {} as typeof defaultAppState;
 
-  for (const [key, val] of Object.entries(defaultAppState) as [
+  for (const [key, defaultValue] of Object.entries(defaultAppState) as [
     keyof typeof defaultAppState,
     any,
   ][]) {
-    const restoredValue = appState[key];
+    const suppliedValue = appState[key];
     const localValue = localAppState ? localAppState[key] : undefined;
     (nextAppState as any)[key] =
-      restoredValue !== undefined
-        ? restoredValue
+      suppliedValue !== undefined
+        ? suppliedValue
         : localValue !== undefined
         ? localValue
-        : val;
+        : defaultValue;
   }
 
   return {
@@ -243,9 +276,38 @@ export const restore = (
    * Supply `null` if you can't get access to it.
    */
   localAppState: Partial<AppState> | null | undefined,
+  localElements: readonly ExcalidrawElement[] | null | undefined,
 ): RestoredDataState => {
   return {
-    elements: restoreElements(data?.elements),
+    elements: restoreElements(data?.elements, localElements),
     appState: restoreAppState(data?.appState, localAppState || null),
+    files: data?.files || {},
   };
+};
+
+export const restoreLibraryItems = (
+  libraryItems: NonOptional<ImportedDataState["libraryItems"]>,
+  defaultStatus: LibraryItem["status"],
+) => {
+  const restoredItems: LibraryItem[] = [];
+  for (const item of libraryItems) {
+    // migrate older libraries
+    if (Array.isArray(item)) {
+      restoredItems.push({
+        status: defaultStatus,
+        elements: item,
+        id: randomId(),
+        created: Date.now(),
+      });
+    } else {
+      const _item = item as MarkOptional<LibraryItem, "id" | "status">;
+      restoredItems.push({
+        ..._item,
+        id: _item.id || randomId(),
+        status: _item.status || defaultStatus,
+        created: _item.created || Date.now(),
+      });
+    }
+  }
+  return restoredItems;
 };

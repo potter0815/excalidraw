@@ -1,18 +1,25 @@
-import React from "react";
 import { trackEvent } from "../analytics";
-import { load, questionCircle, save, saveAs } from "../components/icons";
+import { load, questionCircle, saveAs } from "../components/icons";
 import { ProjectName } from "../components/ProjectName";
 import { ToolButton } from "../components/ToolButton";
 import "../components/ToolIcon.scss";
 import { Tooltip } from "../components/Tooltip";
-import { DarkModeToggle, Appearence } from "../components/DarkModeToggle";
+import { DarkModeToggle } from "../components/DarkModeToggle";
 import { loadFromJSON, saveAsJSON } from "../data";
+import { resaveAsImageWithScene } from "../data/resave";
 import { t } from "../i18n";
 import { useIsMobile } from "../components/App";
 import { KEYS } from "../keys";
 import { register } from "./register";
-import { supported as fsSupported } from "browser-fs-access";
 import { CheckboxItem } from "../components/CheckboxItem";
+import { getExportSize } from "../scene/export";
+import { DEFAULT_EXPORT_PADDING, EXPORT_SCALES, THEME } from "../constants";
+import { getSelectedElements, isSomeElementSelected } from "../scene";
+import { getNonDeletedElements } from "../element";
+import { ActiveFile } from "../components/ActiveFile";
+import { isImageFileHandle } from "../data/blob";
+import { nativeFileSystemSupported } from "../data/filesystem";
+import { Theme } from "../element/types";
 
 export const actionChangeProjectName = register({
   name: "changeProjectName",
@@ -30,6 +37,54 @@ export const actionChangeProjectName = register({
       }
     />
   ),
+});
+
+export const actionChangeExportScale = register({
+  name: "changeExportScale",
+  perform: (_elements, appState, value) => {
+    return {
+      appState: { ...appState, exportScale: value },
+      commitToHistory: false,
+    };
+  },
+  PanelComponent: ({ elements: allElements, appState, updateData }) => {
+    const elements = getNonDeletedElements(allElements);
+    const exportSelected = isSomeElementSelected(elements, appState);
+    const exportedElements = exportSelected
+      ? getSelectedElements(elements, appState)
+      : elements;
+
+    return (
+      <>
+        {EXPORT_SCALES.map((s) => {
+          const [width, height] = getExportSize(
+            exportedElements,
+            DEFAULT_EXPORT_PADDING,
+            s,
+          );
+
+          const scaleButtonTitle = `${t(
+            "buttons.scale",
+          )} ${s}x (${width}x${height})`;
+
+          return (
+            <ToolButton
+              key={s}
+              size="small"
+              type="radio"
+              icon={`${s}x`}
+              name="export-canvas-scale"
+              title={scaleButtonTitle}
+              aria-label={scaleButtonTitle}
+              id="export-canvas-scale"
+              checked={s === appState.exportScale}
+              onChange={() => updateData(s)}
+            />
+          );
+        })}
+      </>
+    );
+  },
 });
 
 export const actionChangeExportBackground = register({
@@ -65,43 +120,29 @@ export const actionChangeExportEmbedScene = register({
     >
       {t("labels.exportEmbedScene")}
       <Tooltip label={t("labels.exportEmbedScene_details")} long={true}>
-        <div className="Tooltip-icon">{questionCircle}</div>
+        <div className="excalidraw-tooltip-icon">{questionCircle}</div>
       </Tooltip>
     </CheckboxItem>
   ),
 });
 
-export const actionChangeShouldAddWatermark = register({
-  name: "changeShouldAddWatermark",
-  perform: (_elements, appState, value) => {
-    return {
-      appState: { ...appState, shouldAddWatermark: value },
-      commitToHistory: false,
-    };
-  },
-  PanelComponent: ({ appState, updateData }) => (
-    <CheckboxItem
-      checked={appState.shouldAddWatermark}
-      onChange={(checked) => updateData(checked)}
-    >
-      {t("labels.addWatermark")}
-    </CheckboxItem>
-  ),
-});
-
-export const actionSaveScene = register({
-  name: "saveScene",
-  perform: async (elements, appState, value) => {
+export const actionSaveToActiveFile = register({
+  name: "saveToActiveFile",
+  perform: async (elements, appState, value, app) => {
     const fileHandleExists = !!appState.fileHandle;
+
     try {
-      const { fileHandle } = await saveAsJSON(elements, appState);
+      const { fileHandle } = isImageFileHandle(appState.fileHandle)
+        ? await resaveAsImageWithScene(elements, appState, app.files)
+        : await saveAsJSON(elements, appState, app.files);
+
       return {
         commitToHistory: false,
         appState: {
           ...appState,
           fileHandle,
           toastMessage: fileHandleExists
-            ? fileHandle.name
+            ? fileHandle?.name
               ? t("toast.fileSavedToFilename").replace(
                   "{filename}",
                   `"${fileHandle.name}"`,
@@ -110,39 +151,43 @@ export const actionSaveScene = register({
             : null,
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error?.name !== "AbortError") {
         console.error(error);
+      } else {
+        console.warn(error);
       }
       return { commitToHistory: false };
     }
   },
   keyTest: (event) =>
     event.key === KEYS.S && event[KEYS.CTRL_OR_CMD] && !event.shiftKey,
-  PanelComponent: ({ updateData }) => (
-    <ToolButton
-      type="icon"
-      icon={save}
-      title={t("buttons.save")}
-      aria-label={t("buttons.save")}
-      onClick={() => updateData(null)}
-      data-testid="save-button"
+  PanelComponent: ({ updateData, appState }) => (
+    <ActiveFile
+      onSave={() => updateData(null)}
+      fileName={appState.fileHandle?.name}
     />
   ),
 });
 
-export const actionSaveAsScene = register({
-  name: "saveAsScene",
-  perform: async (elements, appState, value) => {
+export const actionSaveFileToDisk = register({
+  name: "saveFileToDisk",
+  perform: async (elements, appState, value, app) => {
     try {
-      const { fileHandle } = await saveAsJSON(elements, {
-        ...appState,
-        fileHandle: null,
-      });
+      const { fileHandle } = await saveAsJSON(
+        elements,
+        {
+          ...appState,
+          fileHandle: null,
+        },
+        app.files,
+      );
       return { commitToHistory: false, appState: { ...appState, fileHandle } };
-    } catch (error) {
+    } catch (error: any) {
       if (error?.name !== "AbortError") {
         console.error(error);
+      } else {
+        console.warn(error);
       }
       return { commitToHistory: false };
     }
@@ -156,7 +201,7 @@ export const actionSaveAsScene = register({
       title={t("buttons.saveAs")}
       aria-label={t("buttons.saveAs")}
       showAriaLabel={useIsMobile()}
-      hidden={!fsSupported}
+      hidden={!nativeFileSystemSupported}
       onClick={() => updateData(null)}
       data-testid="save-as-button"
     />
@@ -165,24 +210,28 @@ export const actionSaveAsScene = register({
 
 export const actionLoadScene = register({
   name: "loadScene",
-  perform: async (elements, appState) => {
+  perform: async (elements, appState, _, app) => {
     try {
       const {
         elements: loadedElements,
         appState: loadedAppState,
-      } = await loadFromJSON(appState);
+        files,
+      } = await loadFromJSON(appState, elements);
       return {
         elements: loadedElements,
         appState: loadedAppState,
+        files,
         commitToHistory: true,
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error?.name === "AbortError") {
+        console.warn(error);
         return false;
       }
       return {
         elements,
         appState: { ...appState, errorMessage: error.message },
+        files: app.files,
         commitToHistory: false,
       };
     }
@@ -219,9 +268,9 @@ export const actionExportWithDarkMode = register({
       }}
     >
       <DarkModeToggle
-        value={appState.exportWithDarkMode ? "dark" : "light"}
-        onChange={(theme: Appearence) => {
-          updateData(theme === "dark");
+        value={appState.exportWithDarkMode ? THEME.DARK : THEME.LIGHT}
+        onChange={(theme: Theme) => {
+          updateData(theme === THEME.DARK);
         }}
         title={t("labels.toggleExportColorScheme")}
       />

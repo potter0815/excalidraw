@@ -13,9 +13,10 @@ import { SelectedShapeActions, ShapesSwitcher } from "./Actions";
 import { Section } from "./Section";
 import CollabButton from "./CollabButton";
 import { SCROLLBAR_WIDTH, SCROLLBAR_MARGIN } from "../scene/scrollbars";
-import { LockIcon } from "./LockIcon";
+import { LockButton } from "./LockButton";
 import { UserList } from "./UserList";
 import { BackgroundPickerAndDarkModeToggle } from "./BackgroundPickerAndDarkModeToggle";
+import { LibraryButton } from "./LibraryButton";
 
 type MobileMenuProps = {
   appState: AppState;
@@ -32,6 +33,11 @@ type MobileMenuProps = {
   renderCustomFooter?: (isMobile: boolean, appState: AppState) => JSX.Element;
   viewModeEnabled: boolean;
   showThemeBtn: boolean;
+  onImageAction: (data: { insertOnCanvasDirectly: boolean }) => void;
+  renderTopRightUI?: (
+    isMobile: boolean,
+    appState: AppState,
+  ) => JSX.Element | null;
 };
 
 export const MobileMenu = ({
@@ -49,6 +55,8 @@ export const MobileMenu = ({
   renderCustomFooter,
   viewModeEnabled,
   showThemeBtn,
+  onImageAction,
+  renderTopRightUI,
 }: MobileMenuProps) => {
   const renderToolbar = () => {
     return (
@@ -56,29 +64,40 @@ export const MobileMenu = ({
         <Section heading="shapes">
           {(heading) => (
             <Stack.Col gap={4} align="center">
-              <Stack.Row gap={1}>
-                <Island padding={1}>
+              <Stack.Row gap={1} className="App-toolbar-container">
+                <Island padding={1} className="App-toolbar">
                   {heading}
                   <Stack.Row gap={1}>
                     <ShapesSwitcher
                       canvas={canvas}
                       elementType={appState.elementType}
                       setAppState={setAppState}
-                      isLibraryOpen={appState.isLibraryOpen}
+                      onImageAction={({ pointerType }) => {
+                        onImageAction({
+                          insertOnCanvasDirectly: pointerType !== "mouse",
+                        });
+                      }}
                     />
                   </Stack.Row>
                 </Island>
-                <LockIcon
+                {renderTopRightUI && renderTopRightUI(true, appState)}
+                <LockButton
                   checked={appState.elementLocked}
                   onChange={onLockToggle}
                   title={t("toolBar.lock")}
+                  isMobile
+                />
+                <LibraryButton
+                  appState={appState}
+                  setAppState={setAppState}
+                  isMobile
                 />
               </Stack.Row>
               {libraryMenu}
             </Stack.Col>
           )}
         </Section>
-        <HintViewer appState={appState} elements={elements} />
+        <HintViewer appState={appState} elements={elements} isMobile={true} />
       </FixedSideContainer>
     );
   };
@@ -167,10 +186,9 @@ export const MobileMenu = ({
                           )
                           .map(([clientId, client]) => (
                             <React.Fragment key={clientId}>
-                              {actionManager.renderAction(
-                                "goToCollaborator",
-                                clientId,
-                              )}
+                              {actionManager.renderAction("goToCollaborator", {
+                                id: clientId,
+                              })}
                             </React.Fragment>
                           ))}
                       </UserList>

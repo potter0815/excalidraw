@@ -1,4 +1,3 @@
-import React from "react";
 import { getClientColors, getClientInitials } from "../clients";
 import { Avatar } from "../components/Avatar";
 import { centerScrollOn } from "../scene/scroll";
@@ -30,8 +29,8 @@ export const actionGoToCollaborator = register({
       commitToHistory: false,
     };
   },
-  PanelComponent: ({ appState, updateData, id }) => {
-    const clientId = id;
+  PanelComponent: ({ appState, updateData, data }) => {
+    const clientId: string | undefined = data?.id;
     if (!clientId) {
       return null;
     }

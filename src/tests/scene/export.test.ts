@@ -13,23 +13,31 @@ describe("exportToSvg", () => {
   const DEFAULT_OPTIONS = {
     exportBackground: false,
     viewBackgroundColor: "#ffffff",
-    shouldAddWatermark: false,
+    files: {},
   };
 
-  it("with default arguments", () => {
-    const svgElement = exportUtils.exportToSvg(ELEMENTS, DEFAULT_OPTIONS);
+  it("with default arguments", async () => {
+    const svgElement = await exportUtils.exportToSvg(
+      ELEMENTS,
+      DEFAULT_OPTIONS,
+      null,
+    );
 
     expect(svgElement).toMatchSnapshot();
   });
 
-  it("with background color", () => {
+  it("with background color", async () => {
     const BACKGROUND_COLOR = "#abcdef";
 
-    const svgElement = exportUtils.exportToSvg(ELEMENTS, {
-      ...DEFAULT_OPTIONS,
-      exportBackground: true,
-      viewBackgroundColor: BACKGROUND_COLOR,
-    });
+    const svgElement = await exportUtils.exportToSvg(
+      ELEMENTS,
+      {
+        ...DEFAULT_OPTIONS,
+        exportBackground: true,
+        viewBackgroundColor: BACKGROUND_COLOR,
+      },
+      null,
+    );
 
     expect(svgElement.querySelector("rect")).toHaveAttribute(
       "fill",
@@ -37,36 +45,31 @@ describe("exportToSvg", () => {
     );
   });
 
-  it("with watermark", () => {
-    const svgElement = exportUtils.exportToSvg(ELEMENTS, {
-      ...DEFAULT_OPTIONS,
-      shouldAddWatermark: true,
-    });
-
-    expect(svgElement.querySelector("text")?.textContent).toMatchInlineSnapshot(
-      `"Made with Excalidraw"`,
+  it("with dark mode", async () => {
+    const svgElement = await exportUtils.exportToSvg(
+      ELEMENTS,
+      {
+        ...DEFAULT_OPTIONS,
+        exportWithDarkMode: true,
+      },
+      null,
     );
-  });
-
-  it("with dark mode", () => {
-    const svgElement = exportUtils.exportToSvg(ELEMENTS, {
-      ...DEFAULT_OPTIONS,
-      exportWithDarkMode: true,
-    });
 
     expect(svgElement.getAttribute("filter")).toMatchInlineSnapshot(
       `"themeFilter"`,
     );
   });
 
-  it("with exportPadding, metadata", () => {
-    const svgElement = exportUtils.exportToSvg(ELEMENTS, {
-      ...DEFAULT_OPTIONS,
-      exportPadding: 0,
-      metadata: "some metadata",
-    });
+  it("with exportPadding", async () => {
+    const svgElement = await exportUtils.exportToSvg(
+      ELEMENTS,
+      {
+        ...DEFAULT_OPTIONS,
+        exportPadding: 0,
+      },
+      null,
+    );
 
-    expect(svgElement.innerHTML).toMatch(/some metadata/);
     expect(svgElement).toHaveAttribute("height", ELEMENT_HEIGHT.toString());
     expect(svgElement).toHaveAttribute("width", ELEMENT_WIDTH.toString());
     expect(svgElement).toHaveAttribute(
@@ -75,14 +78,18 @@ describe("exportToSvg", () => {
     );
   });
 
-  it("with scale", () => {
+  it("with scale", async () => {
     const SCALE = 2;
 
-    const svgElement = exportUtils.exportToSvg(ELEMENTS, {
-      ...DEFAULT_OPTIONS,
-      exportPadding: 0,
-      scale: SCALE,
-    });
+    const svgElement = await exportUtils.exportToSvg(
+      ELEMENTS,
+      {
+        ...DEFAULT_OPTIONS,
+        exportPadding: 0,
+        exportScale: SCALE,
+      },
+      null,
+    );
 
     expect(svgElement).toHaveAttribute(
       "height",
@@ -92,5 +99,17 @@ describe("exportToSvg", () => {
       "width",
       (ELEMENT_WIDTH * SCALE).toString(),
     );
+  });
+
+  it("with exportEmbedScene", async () => {
+    const svgElement = await exportUtils.exportToSvg(
+      ELEMENTS,
+      {
+        ...DEFAULT_OPTIONS,
+        exportEmbedScene: true,
+      },
+      null,
+    );
+    expect(svgElement.innerHTML).toMatchSnapshot();
   });
 });

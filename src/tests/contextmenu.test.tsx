@@ -19,6 +19,8 @@ import { ShortcutName } from "../actions/shortcuts";
 import { copiedStyles } from "../actions/actionStyles";
 import { API } from "./helpers/api";
 import { setDateTimeForTests } from "../utils";
+import { t } from "../i18n";
+import { LibraryItem } from "../types";
 
 const checkpoint = (name: string) => {
   expect(renderScene.mock.calls.length).toMatchSnapshot(
@@ -90,9 +92,8 @@ describe("contextMenu element", () => {
       clientY: 1,
     });
     const contextMenu = queryContextMenu();
-    const contextMenuOptions = contextMenu?.querySelectorAll(
-      ".context-menu li",
-    );
+    const contextMenuOptions =
+      contextMenu?.querySelectorAll(".context-menu li");
     const expectedShortcutNames: ShortcutName[] = [
       "selectAll",
       "gridMode",
@@ -121,9 +122,8 @@ describe("contextMenu element", () => {
       clientY: 1,
     });
     const contextMenu = queryContextMenu();
-    const contextMenuOptions = contextMenu?.querySelectorAll(
-      ".context-menu li",
-    );
+    const contextMenuOptions =
+      contextMenu?.querySelectorAll(".context-menu li");
     const expectedShortcutNames: ShortcutName[] = [
       "copyStyles",
       "pasteStyles",
@@ -145,6 +145,46 @@ describe("contextMenu element", () => {
         contextMenu?.querySelector(`li[data-testid="${shortcutName}"]`),
       ).not.toBeNull();
     });
+  });
+
+  it("shows context menu for element", () => {
+    const rect1 = API.createElement({
+      type: "rectangle",
+      x: 0,
+      y: 0,
+      height: 200,
+      width: 200,
+      backgroundColor: "red",
+    });
+    const rect2 = API.createElement({
+      type: "rectangle",
+      x: 0,
+      y: 0,
+      height: 200,
+      width: 200,
+      backgroundColor: "red",
+    });
+    h.elements = [rect1, rect2];
+    API.setSelectedElements([rect1]);
+
+    // lower z-index
+    fireEvent.contextMenu(GlobalTestState.canvas, {
+      button: 2,
+      clientX: 100,
+      clientY: 100,
+    });
+    expect(queryContextMenu()).not.toBeNull();
+    expect(API.getSelectedElement().id).toBe(rect1.id);
+
+    // higher z-index
+    API.setSelectedElements([rect2]);
+    fireEvent.contextMenu(GlobalTestState.canvas, {
+      button: 2,
+      clientX: 100,
+      clientY: 100,
+    });
+    expect(queryContextMenu()).not.toBeNull();
+    expect(API.getSelectedElement().id).toBe(rect2.id);
   });
 
   it("shows 'Group selection' in context menu for multiple selected elements", () => {
@@ -169,9 +209,8 @@ describe("contextMenu element", () => {
     });
 
     const contextMenu = queryContextMenu();
-    const contextMenuOptions = contextMenu?.querySelectorAll(
-      ".context-menu li",
-    );
+    const contextMenuOptions =
+      contextMenu?.querySelectorAll(".context-menu li");
     const expectedShortcutNames: ShortcutName[] = [
       "copyStyles",
       "pasteStyles",
@@ -220,9 +259,8 @@ describe("contextMenu element", () => {
     });
 
     const contextMenu = queryContextMenu();
-    const contextMenuOptions = contextMenu?.querySelectorAll(
-      ".context-menu li",
-    );
+    const contextMenuOptions =
+      contextMenu?.querySelectorAll(".context-menu li");
     const expectedShortcutNames: ShortcutName[] = [
       "copyStyles",
       "pasteStyles",
@@ -274,9 +312,9 @@ describe("contextMenu element", () => {
 
     // Change some styles of second rectangle
     clickLabeledElement("Stroke");
-    clickLabeledElement("#c92a2a");
+    clickLabeledElement(t("colors.c92a2a"));
     clickLabeledElement("Background");
-    clickLabeledElement("#e64980");
+    clickLabeledElement(t("colors.e64980"));
     // Fill style
     fireEvent.click(screen.getByTitle("Cross-hatch"));
     // Stroke width
@@ -355,8 +393,8 @@ describe("contextMenu element", () => {
     await waitFor(() => {
       const library = localStorage.getItem("excalidraw-library");
       expect(library).not.toBeNull();
-      const addedElement = JSON.parse(library!)[0][0];
-      expect(addedElement).toEqual(h.elements[0]);
+      const addedElement = JSON.parse(library!)[0] as LibraryItem;
+      expect(addedElement.elements[0]).toEqual(h.elements[0]);
     });
   });
 

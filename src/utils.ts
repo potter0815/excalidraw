@@ -5,12 +5,10 @@ import {
   FONT_FAMILY,
   WINDOWS_EMOJI_FALLBACK_FONT,
 } from "./constants";
-import { FontFamily, FontString } from "./element/types";
+import { FontFamilyValues, FontString } from "./element/types";
 import { Zoom } from "./types";
 import { unstable_batchedUpdates } from "react-dom";
 import { isDarwin } from "./keys";
-
-export const SVG_NS = "http://www.w3.org/2000/svg";
 
 let mockDateTime: string | null = null;
 
@@ -71,9 +69,14 @@ export const isWritableElement = (
 export const getFontFamilyString = ({
   fontFamily,
 }: {
-  fontFamily: FontFamily;
+  fontFamily: FontFamilyValues;
 }) => {
-  return `${FONT_FAMILY[fontFamily]}, ${WINDOWS_EMOJI_FALLBACK_FONT}`;
+  for (const [fontFamilyString, id] of Object.entries(FONT_FAMILY)) {
+    if (id === fontFamily) {
+      return `${fontFamilyString}, ${WINDOWS_EMOJI_FALLBACK_FONT}`;
+    }
+  }
+  return WINDOWS_EMOJI_FALLBACK_FONT;
 };
 
 /** returns fontSize+fontFamily string for assignment to DOM elements */
@@ -82,40 +85,9 @@ export const getFontString = ({
   fontFamily,
 }: {
   fontSize: number;
-  fontFamily: FontFamily;
+  fontFamily: FontFamilyValues;
 }) => {
   return `${fontSize}px ${getFontFamilyString({ fontFamily })}` as FontString;
-};
-
-// https://github.com/grassator/canvas-text-editor/blob/master/lib/FontMetrics.js
-export const measureText = (text: string, font: FontString) => {
-  const line = document.createElement("div");
-  const body = document.body;
-  line.style.position = "absolute";
-  line.style.whiteSpace = "pre";
-  line.style.font = font;
-  body.appendChild(line);
-  line.innerText = text
-    .split("\n")
-    // replace empty lines with single space because leading/trailing empty
-    // lines would be stripped from computation
-    .map((x) => x || " ")
-    .join("\n");
-  const width = line.offsetWidth;
-  const height = line.offsetHeight;
-  // Now creating 1px sized item that will be aligned to baseline
-  // to calculate baseline shift
-  const span = document.createElement("span");
-  span.style.display = "inline-block";
-  span.style.overflow = "hidden";
-  span.style.width = "1px";
-  span.style.height = "1px";
-  line.appendChild(span);
-  // Baseline is important for positioning text on canvas
-  const baseline = span.offsetTop + span.offsetHeight;
-  document.body.removeChild(line);
-
-  return { width, height, baseline };
 };
 
 export const debounce = <T extends any[]>(
@@ -145,6 +117,23 @@ export const debounce = <T extends any[]>(
     clearTimeout(handle);
   };
   return ret;
+};
+
+// https://github.com/lodash/lodash/blob/es/chunk.js
+export const chunk = <T extends any>(
+  array: readonly T[],
+  size: number,
+): T[][] => {
+  if (!array.length || size < 1) {
+    return [];
+  }
+  let index = 0;
+  let resIndex = 0;
+  const result = Array(Math.ceil(array.length / size));
+  while (index < array.length) {
+    result[resIndex++] = array.slice(index, (index += size));
+  }
+  return result;
 };
 
 export const selectNode = (node: Element) => {
@@ -187,7 +176,9 @@ export const setCursorForShape = (
   }
   if (shape === "selection") {
     resetCursor(canvas);
-  } else {
+    // do nothing if image tool is selected which suggests there's
+    // a image-preview set as the cursor
+  } else if (shape !== "image") {
     canvas.style.cursor = CURSOR_TYPE.CROSSHAIR;
   }
 };
@@ -284,6 +275,7 @@ export const tupleToCoors = (
 /** use as a rejectionHandler to mute filesystem Abort errors */
 export const muteFSAbortError = (error?: Error) => {
   if (error?.name === "AbortError") {
+    console.warn(error);
     return;
   }
   throw error;
@@ -355,7 +347,7 @@ export const resolvablePromise = <T>() => {
  * @param func handler taking at most single parameter (event).
  */
 export const withBatchedUpdates = <
-  TFunction extends ((event: any) => void) | (() => void)
+  TFunction extends ((event: any) => void) | (() => void),
 >(
   func: Parameters<TFunction>["length"] extends 0 | 1 ? TFunction : never,
 ) =>
@@ -438,3 +430,33 @@ export const focusNearestParent = (element: HTMLInputElement) => {
     parent = parent.parentElement;
   }
 };
+
+export const preventUnload = (event: BeforeUnloadEvent) => {
+  event.preventDefault();
+  // NOTE: modern browsers no longer allow showing a custom message here
+  event.returnValue = "";
+};
+
+export const bytesToHexString = (bytes: Uint8Array) => {
+  return Array.from(bytes)
+    .map((byte) => `0${byte.toString(16)}`.slice(-2))
+    .join("");
+};
+
+export const getUpdatedTimestamp = () => (isTestEnv() ? 1 : Date.now());
+
+/**
+ * Transforms array of objects containing `id` attribute,
+ * or array of ids (strings), into a Map, keyd by `id`.
+ */
+export const arrayToMap = <T extends { id: string } | string>(
+  items: readonly T[],
+) => {
+  return items.reduce((acc: Map<string, T>, element) => {
+    acc.set(typeof element === "string" ? element : element.id, element);
+    return acc;
+  }, new Map());
+};
+
+export const isTestEnv = () =>
+  typeof process !== "undefined" && process.env?.NODE_ENV === "test";

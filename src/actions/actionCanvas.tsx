@@ -1,15 +1,11 @@
-import React from "react";
-import { getDefaultAppState } from "../appState";
 import { ColorPicker } from "../components/ColorPicker";
-import { resetZoom, trash, zoomIn, zoomOut } from "../components/icons";
+import { zoomIn, zoomOut } from "../components/icons";
 import { ToolButton } from "../components/ToolButton";
 import { DarkModeToggle } from "../components/DarkModeToggle";
-import { ZOOM_STEP } from "../constants";
+import { THEME, ZOOM_STEP } from "../constants";
 import { getCommonBounds, getNonDeletedElements } from "../element";
-import { newElementWith } from "../element/mutateElement";
 import { ExcalidrawElement } from "../element/types";
 import { t } from "../i18n";
-import { useIsMobile } from "../components/App";
 import { CODES, KEYS } from "../keys";
 import { getNormalizedZoom, getSelectedElements } from "../scene";
 import { centerScrollOn } from "../scene/scroll";
@@ -17,13 +13,17 @@ import { getNewZoom } from "../scene/zoom";
 import { AppState, NormalizedZoomValue } from "../types";
 import { getShortcutKey } from "../utils";
 import { register } from "./register";
+import { Tooltip } from "../components/Tooltip";
+import { newElementWith } from "../element/mutateElement";
+import { getDefaultAppState } from "../appState";
+import ClearCanvas from "../components/ClearCanvas";
 
 export const actionChangeViewBackgroundColor = register({
   name: "changeViewBackgroundColor",
   perform: (_, appState, value) => {
     return {
-      appState: { ...appState, viewBackgroundColor: value },
-      commitToHistory: true,
+      appState: { ...appState, ...value },
+      commitToHistory: !!value.viewBackgroundColor,
     };
   },
   PanelComponent: ({ appState, updateData }) => {
@@ -33,7 +33,11 @@ export const actionChangeViewBackgroundColor = register({
           label={t("labels.canvasBackground")}
           type="canvasBackground"
           color={appState.viewBackgroundColor}
-          onChange={(color) => updateData(color)}
+          onChange={(color) => updateData({ viewBackgroundColor: color })}
+          isActive={appState.openPopup === "canvasColorPicker"}
+          setActive={(active) =>
+            updateData({ openPopup: active ? "canvasColorPicker" : null })
+          }
           data-testid="canvas-background-picker"
         />
       </div>
@@ -43,40 +47,28 @@ export const actionChangeViewBackgroundColor = register({
 
 export const actionClearCanvas = register({
   name: "clearCanvas",
-  perform: (elements, appState: AppState) => {
+  perform: (elements, appState, _, app) => {
+    app.imageCache.clear();
     return {
       elements: elements.map((element) =>
         newElementWith(element, { isDeleted: true }),
       ),
       appState: {
         ...getDefaultAppState(),
+        files: {},
         theme: appState.theme,
         elementLocked: appState.elementLocked,
         exportBackground: appState.exportBackground,
         exportEmbedScene: appState.exportEmbedScene,
         gridSize: appState.gridSize,
-        shouldAddWatermark: appState.shouldAddWatermark,
         showStats: appState.showStats,
         pasteDialog: appState.pasteDialog,
       },
       commitToHistory: true,
     };
   },
-  PanelComponent: ({ updateData }) => (
-    <ToolButton
-      type="button"
-      icon={trash}
-      title={t("buttons.clearReset")}
-      aria-label={t("buttons.clearReset")}
-      showAriaLabel={useIsMobile()}
-      onClick={() => {
-        if (window.confirm(t("alerts.clearReset"))) {
-          updateData(null);
-        }
-      }}
-      data-testid="clear-canvas-button"
-    />
-  ),
+
+  PanelComponent: ({ updateData }) => <ClearCanvas onConfirm={updateData} />,
 });
 
 export const actionZoomIn = register({
@@ -105,6 +97,7 @@ export const actionZoomIn = register({
       onClick={() => {
         updateData(null);
       }}
+      size="small"
     />
   ),
   keyTest: (event) =>
@@ -139,6 +132,7 @@ export const actionZoomOut = register({
       onClick={() => {
         updateData(null);
       }}
+      size="small"
     />
   ),
   keyTest: (event) =>
@@ -165,16 +159,21 @@ export const actionResetZoom = register({
       commitToHistory: false,
     };
   },
-  PanelComponent: ({ updateData }) => (
-    <ToolButton
-      type="button"
-      icon={resetZoom}
-      title={t("buttons.resetZoom")}
-      aria-label={t("buttons.resetZoom")}
-      onClick={() => {
-        updateData(null);
-      }}
-    />
+  PanelComponent: ({ updateData, appState }) => (
+    <Tooltip label={t("buttons.resetZoom")} style={{ height: "100%" }}>
+      <ToolButton
+        type="button"
+        className="reset-zoom-button"
+        title={t("buttons.resetZoom")}
+        aria-label={t("buttons.resetZoom")}
+        onClick={() => {
+          updateData(null);
+        }}
+        size="small"
+      >
+        {(appState.zoom.value * 100).toFixed(0)}%
+      </ToolButton>
+    </Tooltip>
   ),
   keyTest: (event) =>
     (event.code === CODES.ZERO || event.code === CODES.NUM_ZERO) &&
@@ -268,7 +267,8 @@ export const actionToggleTheme = register({
     return {
       appState: {
         ...appState,
-        theme: value || (appState.theme === "light" ? "dark" : "light"),
+        theme:
+          value || (appState.theme === THEME.LIGHT ? THEME.DARK : THEME.LIGHT),
       },
       commitToHistory: false,
     };
