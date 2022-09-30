@@ -7,7 +7,7 @@ import { DarkModeToggle } from "../components/DarkModeToggle";
 import { loadFromJSON, saveAsJSON } from "../data";
 import { resaveAsImageWithScene } from "../data/resave";
 import { t } from "../i18n";
-import { useDeviceType } from "../components/App";
+import { useDevice } from "../components/App";
 import { KEYS } from "../keys";
 import { register } from "./register";
 import { CheckboxItem } from "../components/CheckboxItem";
@@ -144,13 +144,15 @@ export const actionSaveToActiveFile = register({
         appState: {
           ...appState,
           fileHandle,
-          toastMessage: fileHandleExists
-            ? fileHandle?.name
-              ? t("toast.fileSavedToFilename").replace(
-                  "{filename}",
-                  `"${fileHandle.name}"`,
-                )
-              : t("toast.fileSaved")
+          toast: fileHandleExists
+            ? {
+                message: fileHandle?.name
+                  ? t("toast.fileSavedToFilename").replace(
+                      "{filename}",
+                      `"${fileHandle.name}"`,
+                    )
+                  : t("toast.fileSaved"),
+              }
             : null,
         },
       };
@@ -204,7 +206,7 @@ export const actionSaveFileToDisk = register({
       icon={saveAs}
       title={t("buttons.saveAs")}
       aria-label={t("buttons.saveAs")}
-      showAriaLabel={useDeviceType().isMobile}
+      showAriaLabel={useDevice().isMobile}
       hidden={!nativeFileSystemSupported}
       onClick={() => updateData(null)}
       data-testid="save-as-button"
@@ -242,13 +244,13 @@ export const actionLoadScene = register({
     }
   },
   keyTest: (event) => event[KEYS.CTRL_OR_CMD] && event.key === KEYS.O,
-  PanelComponent: ({ updateData, appState }) => (
+  PanelComponent: ({ updateData }) => (
     <ToolButton
       type="button"
       icon={load}
       title={t("buttons.load")}
       aria-label={t("buttons.load")}
-      showAriaLabel={useDeviceType().isMobile}
+      showAriaLabel={useDevice().isMobile}
       onClick={updateData}
       data-testid="load-button"
     />

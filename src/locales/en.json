@@ -114,13 +114,24 @@
       "create": "Create link",
       "label": "Link"
     },
+    "lineEditor": {
+      "edit": "Edit line",
+      "exit": "Exit line editor"
+    },
+
     "elementLock": {
       "lock": "Lock",
       "unlock": "Unlock",
       "lockAll": "Lock all",
       "unlockAll": "Unlock all"
     },
-    "statusPublished": "Published"
+    "statusPublished": "Published",
+    "sidebarLock": "Keep sidebar open"
+  },
+  "library": {
+    "noItems": "No items added yet...",
+    "hint_emptyLibrary": "Select an item on canvas to add it here, or install a library from the public repository, below.",
+    "hint_emptyPrivateLibrary": "Select an item on canvas to add it here."
   },
   "buttons": {
     "clearReset": "Reset the canvas",

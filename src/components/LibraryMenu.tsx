@@ -29,6 +29,7 @@ import { trackEvent } from "../analytics";
 import { useAtom } from "jotai";
 import { jotaiScope } from "../jotai";
 import Spinner from "./Spinner";
+import { useDevice } from "./App";
 
 const useOnClickOutside = (
   ref: RefObject<HTMLElement>,
@@ -79,7 +80,6 @@ export const LibraryMenu = ({
   onInsertLibraryItems,
   pendingElements,
   onAddToLibrary,
-  theme,
   setAppState,
   files,
   libraryReturnUrl,
@@ -92,7 +92,6 @@ export const LibraryMenu = ({
   onClose: () => void;
   onInsertLibraryItems: (libraryItems: LibraryItems) => void;
   onAddToLibrary: () => void;
-  theme: AppState["theme"];
   files: BinaryFiles;
   setAppState: React.Component<any, AppState>["setState"];
   libraryReturnUrl: ExcalidrawProps["libraryReturnUrl"];
@@ -103,17 +102,30 @@ export const LibraryMenu = ({
 }) => {
   const ref = useRef<HTMLDivElement | null>(null);
 
-  useOnClickOutside(ref, (event) => {
-    // If click on the library icon, do nothing.
-    if ((event.target as Element).closest(".ToolIcon__library")) {
-      return;
-    }
-    onClose();
-  });
+  const device = useDevice();
+  useOnClickOutside(
+    ref,
+    useCallback(
+      (event) => {
+        // If click on the library icon, do nothing so that LibraryButton
+        // can toggle library menu
+        if ((event.target as Element).closest(".ToolIcon__library")) {
+          return;
+        }
+        if (!appState.isLibraryMenuDocked || !device.canDeviceFitSidebar) {
+          onClose();
+        }
+      },
+      [onClose, appState.isLibraryMenuDocked, device.canDeviceFitSidebar],
+    ),
+  );
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === KEYS.ESCAPE) {
+      if (
+        event.key === KEYS.ESCAPE &&
+        (!appState.isLibraryMenuDocked || !device.canDeviceFitSidebar)
+      ) {
         onClose();
       }
     };
@@ -121,7 +133,7 @@ export const LibraryMenu = ({
     return () => {
       document.removeEventListener(EVENT.KEYDOWN, handleKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, appState.isLibraryMenuDocked, device.canDeviceFitSidebar]);
 
   const [selectedItems, setSelectedItems] = useState<LibraryItem["id"][]>([]);
   const [showPublishLibraryDialog, setShowPublishLibraryDialog] =
@@ -210,7 +222,7 @@ export const LibraryMenu = ({
   }, [setPublishLibSuccess, publishLibSuccess]);
 
   const onPublishLibSuccess = useCallback(
-    (data, libraryItems: LibraryItems) => {
+    (data: { url: string; authorName: string }, libraryItems: LibraryItems) => {
       setShowPublishLibraryDialog(false);
       setPublishLibSuccess({ url: data.url, authorName: data.authorName });
       const nextLibItems = libraryItems.slice();
@@ -273,9 +285,10 @@ export const LibraryMenu = ({
         onInsertLibraryItems={onInsertLibraryItems}
         pendingElements={pendingElements}
         setAppState={setAppState}
+        appState={appState}
         libraryReturnUrl={libraryReturnUrl}
         library={library}
-        theme={theme}
+        theme={appState.theme}
         files={files}
         id={id}
         selectedItems={selectedItems}

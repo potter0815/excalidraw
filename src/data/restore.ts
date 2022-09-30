@@ -67,13 +67,14 @@ const getFontFamilyByName = (fontFamilyName: string): FontFamilyValues => {
 };
 
 const restoreElementWithProperties = <
-  T extends ExcalidrawElement,
-  K extends Pick<T, keyof Omit<Required<T>, keyof ExcalidrawElement>>,
->(
-  element: Required<T> & {
+  T extends Required<Omit<ExcalidrawElement, "customData">> & {
+    customData?: ExcalidrawElement["customData"];
     /** @deprecated */
     boundElementIds?: readonly ExcalidrawElement["id"][];
   },
+  K extends Pick<T, keyof Omit<Required<T>, keyof ExcalidrawElement>>,
+>(
+  element: T,
   extra: Pick<
     T,
     // This extra Pick<T, keyof K> ensure no excess properties are passed.
@@ -114,6 +115,10 @@ const restoreElementWithProperties = <
     link: element.link ?? null,
     locked: element.locked ?? false,
   };
+
+  if ("customData" in element) {
+    base.customData = element.customData;
+  }
 
   return {
     ...base,
@@ -283,6 +288,11 @@ export const restoreAppState = (
             value: appState.zoom as NormalizedZoomValue,
           }
         : appState.zoom || defaultAppState.zoom,
+    // when sidebar docked and user left it open in last session,
+    // keep it open. If not docked, keep it closed irrespective of last state.
+    isLibraryOpen: nextAppState.isLibraryMenuDocked
+      ? nextAppState.isLibraryOpen
+      : false,
   };
 };
 

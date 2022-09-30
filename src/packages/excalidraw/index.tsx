@@ -1,5 +1,4 @@
 import React, { useEffect, forwardRef } from "react";
-
 import { InitializeApp } from "../../components/InitializeApp";
 import App from "../../components/App";
 
@@ -44,6 +43,7 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
   const canvasActions = props.UIOptions?.canvasActions;
 
   const UIOptions: AppProps["UIOptions"] = {
+    ...props.UIOptions,
     canvasActions: {
       ...DEFAULT_UI_OPTIONS.canvasActions,
       ...canvasActions,
@@ -54,6 +54,13 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
     UIOptions.canvasActions.export.saveFileToDisk =
       canvasActions.export?.saveFileToDisk ??
       DEFAULT_UI_OPTIONS.canvasActions.export.saveFileToDisk;
+  }
+
+  if (
+    UIOptions.canvasActions.toggleTheme === null &&
+    typeof theme === "undefined"
+  ) {
+    UIOptions.canvasActions.toggleTheme = true;
   }
 
   useEffect(() => {
@@ -75,7 +82,7 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
   }, []);
 
   return (
-    <InitializeApp langCode={langCode}>
+    <InitializeApp langCode={langCode} theme={theme}>
       <Provider unstable_createStore={() => jotaiStore} scope={jotaiScope}>
         <App
           onChange={onChange}
@@ -179,6 +186,7 @@ const forwardedRefComp = forwardRef<
 >((props, ref) => <ExcalidrawBase {...props} excalidrawRef={ref} />);
 
 export const Excalidraw = React.memo(forwardedRefComp, areEqual);
+Excalidraw.displayName = "Excalidraw";
 
 export {
   getSceneVersion,

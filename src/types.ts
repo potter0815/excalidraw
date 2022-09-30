@@ -48,6 +48,8 @@ export type Collaborator = {
   // The url of the collaborator's avatar, defaults to username intials
   // if not present
   avatarUrl?: string;
+  // user id. If supplied, we'll filter out duplicates when rendering user avatars.
+  id?: string;
 };
 
 export type DataURL = string & { _brand: "DataURL" };
@@ -143,7 +145,7 @@ export type AppState = {
   previousSelectedElementIds: { [id: string]: boolean };
   shouldCacheIgnoreZoom: boolean;
   showHelpDialog: boolean;
-  toastMessage: string | null;
+  toast: { message: string; closable?: boolean; duration?: number } | null;
   zenModeEnabled: boolean;
   theme: Theme;
   gridSize: number | null;
@@ -160,6 +162,7 @@ export type AppState = {
   offsetLeft: number;
 
   isLibraryOpen: boolean;
+  isLibraryMenuDocked: boolean;
   fileHandle: FileSystemHandle | null;
   collaborators: Map<string, Collaborator>;
   showStats: boolean;
@@ -174,8 +177,9 @@ export type AppState = {
         data: Spreadsheet;
       };
   /** imageElement waiting to be placed on canvas */
-  pendingImageElement: NonDeleted<ExcalidrawImageElement> | null;
+  pendingImageElementId: ExcalidrawImageElement["id"] | null;
   showHyperlinkPopup: false | "info" | "editor";
+  selectedLinearElement: LinearElementEditor | null;
 };
 
 export type NormalizedZoomValue = number & { _brand: "normalizedZoom" };
@@ -277,7 +281,7 @@ export interface ExcalidrawProps {
     isMobile: boolean,
     appState: AppState,
   ) => JSX.Element | null;
-  renderFooter?: (isMobile: boolean, appState: AppState) => JSX.Element;
+  renderFooter?: (isMobile: boolean, appState: AppState) => JSX.Element | null;
   langCode?: Language["code"];
   viewModeEnabled?: boolean;
   zenModeEnabled?: boolean;
@@ -289,7 +293,10 @@ export interface ExcalidrawProps {
     elements: readonly NonDeletedExcalidrawElement[],
     appState: AppState,
   ) => JSX.Element;
-  UIOptions?: UIOptions;
+  UIOptions?: {
+    dockedSidebarBreakpoint?: number;
+    canvasActions?: CanvasActions;
+  };
   detectScroll?: boolean;
   handleKeyboardGlobally?: boolean;
   onLibraryChange?: (libraryItems: LibraryItems) => void | Promise<any>;
@@ -337,28 +344,32 @@ export type ExportOpts = {
   ) => JSX.Element;
 };
 
+// NOTE at the moment, if action name coressponds to canvasAction prop, its
+// truthiness value will determine whether the action is rendered or not
+// (see manager renderAction). We also override canvasAction values in
+// excalidraw package index.tsx.
 type CanvasActions = {
   changeViewBackgroundColor?: boolean;
   clearCanvas?: boolean;
   export?: false | ExportOpts;
   loadScene?: boolean;
   saveToActiveFile?: boolean;
-  theme?: boolean;
+  toggleTheme?: boolean | null;
   saveAsImage?: boolean;
 };
 
-export type UIOptions = {
-  canvasActions?: CanvasActions;
-};
-
-export type AppProps = ExcalidrawProps & {
-  UIOptions: {
-    canvasActions: Required<CanvasActions> & { export: ExportOpts };
-  };
-  detectScroll: boolean;
-  handleKeyboardGlobally: boolean;
-  isCollaborating: boolean;
-};
+export type AppProps = Merge<
+  ExcalidrawProps,
+  {
+    UIOptions: {
+      canvasActions: Required<CanvasActions> & { export: ExportOpts };
+      dockedSidebarBreakpoint?: number;
+    };
+    detectScroll: boolean;
+    handleKeyboardGlobally: boolean;
+    isCollaborating: boolean;
+  }
+>;
 
 /** A subset of App class properties that we need to use elsewhere
  * in the app, eg Manager. Factored out into a separate type to keep DRY. */
@@ -375,7 +386,8 @@ export type AppClassProperties = {
     }
   >;
   files: BinaryFiles;
-  deviceType: App["deviceType"];
+  device: App["device"];
+  scene: App["scene"];
 };
 
 export type PointerDownState = Readonly<{
@@ -414,7 +426,6 @@ export type PointerDownState = Readonly<{
     // pointer interaction
     hasBeenDuplicated: boolean;
     hasHitCommonBoundingBoxOfSelectedElements: boolean;
-    hasHitElementInside: boolean;
   };
   withCmdOrCtrl: boolean;
   drag: {
@@ -460,15 +471,19 @@ export type ExcalidrawImperativeAPI = {
   getAppState: () => InstanceType<typeof App>["state"];
   getFiles: () => InstanceType<typeof App>["files"];
   refresh: InstanceType<typeof App>["refresh"];
-  setToastMessage: InstanceType<typeof App>["setToastMessage"];
+  setToast: InstanceType<typeof App>["setToast"];
   addFiles: (data: BinaryFileData[]) => void;
   readyPromise: ResolvablePromise<ExcalidrawImperativeAPI>;
   ready: true;
   id: string;
   setActiveTool: InstanceType<typeof App>["setActiveTool"];
+  setCursor: InstanceType<typeof App>["setCursor"];
+  resetCursor: InstanceType<typeof App>["resetCursor"];
 };
 
-export type DeviceType = {
+export type Device = Readonly<{
+  isSmScreen: boolean;
   isMobile: boolean;
   isTouchScreen: boolean;
-};
+  canDeviceFitSidebar: boolean;
+}>;
